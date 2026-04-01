@@ -134,9 +134,12 @@ async def resume_debate():
 
 @app.post("/api/debate/judge")
 async def judge_debate():
-    """Request judge's analysis."""
+    """Request judge's analysis. Only allowed when debate is not actively running."""
     if not debate_engine or not debate_engine.state:
         raise HTTPException(status_code=400, detail="No active debate")
+
+    if debate_engine.state.active:
+        raise HTTPException(status_code=400, detail="Please stop the debate before requesting a judgment")
 
     asyncio.create_task(debate_engine.judge())
     return {"status": "judging"}

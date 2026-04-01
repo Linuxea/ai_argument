@@ -427,7 +427,7 @@ class DebateApp {
                 this.resumeBtn.disabled = true;
                 this.userInput.disabled = false;
                 this.sendBtn.disabled = false;
-                this.judgeBtn.disabled = false;
+                this.judgeBtn.disabled = true;
                 break;
 
             case 'paused':
@@ -445,7 +445,7 @@ class DebateApp {
                 this.resumeBtn.disabled = true;
                 this.userInput.disabled = true;
                 this.sendBtn.disabled = true;
-                this.judgeBtn.disabled = true;
+                this.judgeBtn.disabled = false;
                 break;
         }
     }
