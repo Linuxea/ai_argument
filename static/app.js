@@ -197,7 +197,7 @@ class DebateApp {
                 body: JSON.stringify({
                     topic: topic,
                     debater_names: selectedDebaters,
-                    max_rounds: parseInt(this.maxRoundsInput.value) || 3
+                    max_rounds: parseInt(this.maxRoundsInput.value) || 10
                 })
             });
 
