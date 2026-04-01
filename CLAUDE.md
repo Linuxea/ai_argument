@@ -62,12 +62,22 @@ The app uses module-level globals (`debate_engine`, `custom_debaters`) in `main.
 | `config.py` | Settings class, loads presets from YAML |
 | `models.py` | Pydantic models for API contracts |
 
+## Frontend
+
+Single-page app in `static/` using vanilla JS (`DebateApp` class in `app.js`). Key patterns:
+- SSE connection handles all event types and renders them in real-time
+- UI state machine: `idle` → `debating` → `paused`/`stopped` (controls button enable/disable)
+- Debaters are draggable to set turn order
+- `marked.js` renders Markdown; `[[Name]]` patterns in messages become highlighted mention badges
+- Settings sync bidirectionally: localStorage ↔ backend API
+- Download exports the chat as a self-contained HTML file
+
 ## Configuration
 
-Defaults to Ollama at `http://localhost:11434/v1`. Change via:
-- UI sidebar (requires server restart)
-- Environment variables or `config.py` defaults
-- Settings are stored in `config.py:Settings` class
+Defaults to DeepSeek (`https://api.deepseek.com`, model `deepseek-chat`, env var `DEEPSEEK_API_KEY`). Works with any OpenAI-compatible API. Change via:
+- UI sidebar (URL, API key, model dropdown with auto-discovery)
+- `DEEPSEEK_API_KEY` environment variable
+- `config.py:Settings` class defaults
 
 ## Adding a New Preset Debater
 
