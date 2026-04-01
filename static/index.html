@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Debate Chatroom</title>
+    <title>AI 辩论聊天室</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,67 +14,67 @@
 <body>
     <div class="app">
         <aside class="sidebar">
-            <h1>AI Debate</h1>
+            <h1>AI 辩论</h1>
 
             <section class="sidebar-section">
-                <label for="topic-input">Debate Topic</label>
-                <textarea id="topic-input" rows="3" placeholder="Enter a topic for debate..."></textarea>
+                <label for="topic-input">辩论主题</label>
+                <textarea id="topic-input" rows="3" placeholder="输入辩论主题..."></textarea>
                 <div class="max-rounds-row">
-                    <label for="max-rounds">Max Rounds</label>
+                    <label for="max-rounds">最大轮次</label>
                     <input type="number" id="max-rounds" min="1" max="20" step="1" value="10">
                 </div>
             </section>
 
             <section class="sidebar-section">
-                <label>Debaters</label>
+                <label>辩手</label>
                 <div id="debater-list"></div>
             </section>
 
             <section class="sidebar-section">
-                <label>API Settings</label>
-                <input type="text" id="api-url" placeholder="API URL (default: https://api.deepseek.com)" value="">
-                <input type="password" id="api-key" placeholder="API Key (default: $DEEPSEEK_API_KEY)" value="">
+                <label>API 设置</label>
+                <input type="text" id="api-url" placeholder="API 地址（默认：https://api.deepseek.com）" value="">
+                <input type="password" id="api-key" placeholder="API 密钥（默认：$DEEPSEEK_API_KEY）" value="">
                 <select id="model-name">
-                    <option value="">-- Fetch models via Save --</option>
+                    <option value="">-- 保存后获取模型列表 --</option>
                 </select>
-                <button id="save-settings-btn">Save Settings</button>
+                <button id="save-settings-btn">保存设置</button>
             </section>
 
             <section class="sidebar-section">
-                <button id="start-btn" class="primary-btn">Start Debate</button>
-                <button id="stop-btn" disabled>Stop</button>
-                <button id="resume-btn" disabled>Resume</button>
+                <button id="start-btn" class="primary-btn">开始辩论</button>
+                <button id="stop-btn" disabled>暂停</button>
+                <button id="resume-btn" disabled>继续</button>
             </section>
 
             <section class="sidebar-section">
-                <h3>Custom Debater</h3>
-                <input type="text" id="custom-name" placeholder="Name">
+                <h3>自定义辩手</h3>
+                <input type="text" id="custom-name" placeholder="名称">
                 <div class="inline-inputs">
                     <input type="color" id="custom-color" value="#ff6600">
-                    <input type="text" id="custom-avatar" placeholder="Emoji" maxlength="2">
+                    <input type="text" id="custom-avatar" placeholder="表情" maxlength="2">
                 </div>
                 <select id="custom-stance">
-                    <option value="for">For</option>
-                    <option value="against">Against</option>
-                    <option value="neutral" selected>Neutral</option>
+                    <option value="for">支持</option>
+                    <option value="against">反对</option>
+                    <option value="neutral" selected>中立</option>
                 </select>
-                <textarea id="custom-personality" rows="3" placeholder="Personality description..."></textarea>
-                <button id="add-debater-btn">Add Debater</button>
+                <textarea id="custom-personality" rows="3" placeholder="性格描述..."></textarea>
+                <button id="add-debater-btn">添加辩手</button>
             </section>
         </aside>
 
         <main class="chat-area">
             <header class="chat-header">
-                <h2 id="chat-title">Enter a topic to start a debate</h2>
-                <button id="judge-btn" disabled hidden>Be Judge</button>
-                <button id="download-btn" disabled>Download</button>
+                <h2 id="chat-title">输入主题开始辩论</h2>
+                <button id="judge-btn" disabled hidden>请裁判点评</button>
+                <button id="download-btn" disabled>下载</button>
             </header>
 
             <div id="messages" class="messages"></div>
 
             <div class="input-bar">
-                <input type="text" id="user-input" placeholder="Join the discussion..." disabled>
-                <button id="send-btn" disabled>Send</button>
+                <input type="text" id="user-input" placeholder="参与讨论..." disabled>
+                <button id="send-btn" disabled>发送</button>
             </div>
         </main>
     </div>

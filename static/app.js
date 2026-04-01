@@ -164,13 +164,13 @@ class DebateApp {
     async startDebate() {
         const topic = this.topicInput.value.trim();
         if (!topic) {
-            alert('Please enter a debate topic');
+            alert('请输入辩论主题');
             return;
         }
 
         const selectedDebaters = this.getSelectedDebaters();
         if (selectedDebaters.length < 2) {
-            alert('Please select at least 2 debaters');
+            alert('请至少选择2位辩手');
             return;
         }
 
@@ -203,7 +203,7 @@ class DebateApp {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || 'Failed to start debate');
+                throw new Error(error.detail || '启动辩论失败');
             }
 
             this.debateActive = true;
@@ -248,7 +248,7 @@ class DebateApp {
 
         this.eventSource.addEventListener('round_end', (e) => {
             const data = JSON.parse(e.data);
-            this.addSystemMessage(`Round ${data.round_number} complete`);
+            this.addSystemMessage(`第 ${data.round_number} 轮结束`);
         });
 
         this.eventSource.addEventListener('debate_end', (e) => {
@@ -258,7 +258,8 @@ class DebateApp {
             this.updateUI('stopped');
             this.eventSource.close();
             this.eventSource = null;
-            this.addSystemMessage(`Debate ended: ${data.reason}`);
+            const reasonMap = { 'Max rounds reached': '已达到最大轮次', 'Stopped by user': '用户手动停止' };
+            this.addSystemMessage(`辩论结束：${reasonMap[data.reason] || data.reason}`);
 
             // Auto-trigger judge when debate ends naturally (max rounds reached)
             if (data.reason === 'Max rounds reached') {
@@ -271,7 +272,7 @@ class DebateApp {
 
             // Create judge message if not exists
             if (!this.currentMessageEl || !this.currentMessageEl.dataset.judge) {
-                this.createMessage('Judge', '#10b981', '⚖️', 'judge');
+                this.createMessage('裁判', '#10b981', '⚖️', 'judge');
                 this.currentMessageEl.dataset.judge = 'true';
             }
 
@@ -370,7 +371,7 @@ class DebateApp {
         message.innerHTML = `
             <div class="message-header">
                 <span class="message-avatar">👤</span>
-                <span class="message-sender">You</span>
+                <span class="message-sender">你</span>
                 <span class="message-time">${time}</span>
             </div>
             <div class="message-content">${this.escapeHtml(text)}</div>
@@ -405,7 +406,7 @@ class DebateApp {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || 'Failed to stop debate');
+                throw new Error(error.detail || '暂停辩论失败');
             }
 
             this.debatePaused = true;
@@ -423,7 +424,7 @@ class DebateApp {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || 'Failed to resume debate');
+                throw new Error(error.detail || '继续辩论失败');
             }
 
             this.debatePaused = false;
@@ -449,7 +450,7 @@ class DebateApp {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || 'Failed to send message');
+                throw new Error(error.detail || '发送消息失败');
             }
 
             this.addUserMessage(text);
@@ -467,7 +468,7 @@ class DebateApp {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || 'Failed to request judge');
+                throw new Error(error.detail || '请求裁判失败');
             }
 
             // Reconnect SSE to receive judge events
@@ -484,7 +485,7 @@ class DebateApp {
         const topic = this.chatTitle.textContent;
         const msgEls = this.messages.querySelectorAll('.message');
         if (msgEls.length === 0) {
-            alert('No messages to download.');
+            alert('没有可下载的消息。');
             return;
         }
 
@@ -509,7 +510,7 @@ class DebateApp {
         });
 
         const html = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><title>${this.escapeHtml(topic)}</title>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>${this.escapeHtml(topic)}</title>
 <style>
   body{font-family:'Outfit',system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;background:#f5f1ea;color:#1a1714;line-height:1.7}
   h1{font-family:'Playfair Display',Georgia,serif;font-size:1.4rem;text-align:center;padding-bottom:16px;border-bottom:2px solid #c0503a;margin-bottom:28px}
@@ -544,12 +545,12 @@ ${body}
         const personality = this.customPersonality.value.trim();
 
         if (!name) {
-            alert('Please enter a debater name');
+            alert('请输入辩手名称');
             return;
         }
 
         if (!personality) {
-            alert('Please enter a personality description');
+            alert('请输入性格描述');
             return;
         }
 
@@ -568,7 +569,7 @@ ${body}
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || 'Failed to create debater');
+                throw new Error(error.detail || '创建辩手失败');
             }
 
             // Clear form
@@ -678,7 +679,7 @@ ${body}
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || 'Failed to save settings');
+                throw new Error(error.detail || '保存设置失败');
             }
 
             // Also cache to localStorage for page reloads
@@ -690,7 +691,7 @@ ${body}
             // Fetch available models and populate dropdown
             await this.fetchModels();
 
-            alert('Settings saved and applied.');
+            alert('设置已保存并生效。');
         } catch (error) {
             console.error('Failed to save settings:', error);
             alert(error.message);
