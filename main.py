@@ -150,16 +150,6 @@ async def judge_debate():
     return {"status": "judging"}
 
 
-@app.get("/api/settings")
-async def get_settings():
-    """Return current API settings."""
-    return {
-        "api_url": settings.api_base_url,
-        "api_key": settings.api_key,
-        "model_name": settings.model,
-    }
-
-
 @app.get("/api/models")
 async def list_models():
     """Fetch available models from the configured API provider."""
