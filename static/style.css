@@ -1,0 +1,483 @@
+/* CSS Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-primary: #1a1a2e;
+    --bg-sidebar: #16213e;
+    --bg-input: #0f0f23;
+    --bg-message: #1f2937;
+    --accent: #e94560;
+    --accent-hover: #ff5a77;
+    --text-primary: #eaeaea;
+    --text-secondary: #a0a0a0;
+    --text-muted: #6b7280;
+    --border-color: #2d3748;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Main App Layout */
+.app {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: 300px;
+    min-width: 300px;
+    background-color: var(--bg-sidebar);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    border-right: 1px solid var(--border-color);
+}
+
+.sidebar h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: center;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--accent);
+}
+
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sidebar-section label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-section h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Input Styles */
+input[type="text"],
+input[type="password"],
+textarea,
+select {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.2);
+}
+
+input[type="text"]::placeholder,
+input[type="password"]::placeholder,
+textarea::placeholder {
+    color: var(--text-muted);
+}
+
+textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+select {
+    cursor: pointer;
+}
+
+/* Color Input */
+input[type="color"] {
+    width: 50px;
+    height: 38px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    background-color: var(--bg-input);
+    padding: 2px;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+input[type="color"]::-webkit-color-swatch {
+    border-radius: 4px;
+    border: none;
+}
+
+/* Inline Inputs Container */
+.inline-inputs {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.inline-inputs input[type="text"] {
+    flex: 1;
+}
+
+/* Button Styles */
+button {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 16px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+button:hover:not(:disabled) {
+    background-color: var(--border-color);
+    border-color: var(--text-muted);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.primary-btn {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    font-weight: 600;
+}
+
+.primary-btn:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+/* Debater List */
+#debater-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.debater-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background-color: var(--bg-input);
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.debater-item:hover {
+    background-color: var(--border-color);
+}
+
+.debater-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.debater-avatar {
+    font-size: 1.2rem;
+}
+
+.debater-name {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.debater-stance {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background-color: var(--bg-message);
+    text-transform: capitalize;
+}
+
+/* Chat Area Styles */
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-primary);
+    min-width: 0;
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background-color: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.chat-header h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#judge-btn {
+    background-color: var(--success);
+    border-color: var(--success);
+    color: white;
+    font-weight: 600;
+}
+
+#judge-btn:hover:not(:disabled) {
+    background-color: #059669;
+    border-color: #059669;
+}
+
+/* Messages Container */
+.messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Message Bubble */
+.message {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 85%;
+    animation: messageSlideIn 0.3s ease-out;
+}
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message.user {
+    align-self: flex-end;
+}
+
+.message.ai {
+    align-self: flex-start;
+}
+
+.message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.message-avatar {
+    font-size: 1.1rem;
+}
+
+.message-sender {
+    font-weight: 600;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.message-content {
+    background-color: var(--bg-message);
+    padding: 12px 16px;
+    border-radius: 12px;
+    border-left: 4px solid var(--accent);
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.message.user .message-content {
+    background-color: var(--accent);
+    border-left-color: var(--accent-hover);
+}
+
+.message.system {
+    align-self: center;
+    max-width: 60%;
+}
+
+.message.system .message-content {
+    background-color: var(--bg-sidebar);
+    border-left-color: var(--warning);
+    text-align: center;
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* Input Bar */
+.input-bar {
+    display: flex;
+    gap: 10px;
+    padding: 15px 20px;
+    background-color: var(--bg-sidebar);
+    border-top: 1px solid var(--border-color);
+}
+
+.input-bar input[type="text"] {
+    flex: 1;
+}
+
+.input-bar button {
+    min-width: 80px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-input);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .app {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .chat-header h2 {
+        font-size: 1rem;
+        max-width: 200px;
+    }
+
+    .message {
+        max-width: 95%;
+    }
+}
+
+/* Loading Animation */
+.loading-dots {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.loading-dots span {
+    width: 8px;
+    height: 8px;
+    background-color: var(--accent);
+    border-radius: 50%;
+    animation: loadingBounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes loadingBounce {
+    0%, 80%, 100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}
+
+/* Status Indicator */
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-muted);
+}
+
+.status-dot.active {
+    background-color: var(--success);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}

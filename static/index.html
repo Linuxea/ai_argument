@@ -4,9 +4,69 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Debate Chatroom</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>AI Debate Chatroom</h1>
-    <p>Frontend will be implemented in Task 6 & 7</p>
+    <div class="app">
+        <aside class="sidebar">
+            <h1>AI Debate</h1>
+
+            <section class="sidebar-section">
+                <label for="topic-input">Debate Topic</label>
+                <textarea id="topic-input" rows="3" placeholder="Enter a topic for debate..."></textarea>
+            </section>
+
+            <section class="sidebar-section">
+                <label>Debaters</label>
+                <div id="debater-list"></div>
+            </section>
+
+            <section class="sidebar-section">
+                <label>API Settings</label>
+                <input type="text" id="api-url" placeholder="API Base URL" value="http://localhost:11434/v1">
+                <input type="password" id="api-key" placeholder="API Key" value="ollama">
+                <input type="text" id="model-name" placeholder="Model Name" value="llama3">
+                <button id="save-settings-btn">Save Settings</button>
+            </section>
+
+            <section class="sidebar-section">
+                <button id="start-btn" class="primary-btn">Start Debate</button>
+                <button id="stop-btn" disabled>Stop</button>
+                <button id="resume-btn" disabled>Resume</button>
+            </section>
+
+            <section class="sidebar-section">
+                <h3>Custom Debater</h3>
+                <input type="text" id="custom-name" placeholder="Name">
+                <div class="inline-inputs">
+                    <input type="color" id="custom-color" value="#ff6600">
+                    <input type="text" id="custom-avatar" placeholder="Emoji" maxlength="2">
+                </div>
+                <select id="custom-stance">
+                    <option value="for">For</option>
+                    <option value="against">Against</option>
+                    <option value="neutral" selected>Neutral</option>
+                </select>
+                <textarea id="custom-personality" rows="3" placeholder="Personality description..."></textarea>
+                <button id="add-debater-btn">Add Debater</button>
+            </section>
+        </aside>
+
+        <main class="chat-area">
+            <header class="chat-header">
+                <h2 id="chat-title">Enter a topic to start a debate</h2>
+                <button id="judge-btn" disabled>Be Judge</button>
+            </header>
+
+            <div id="messages" class="messages"></div>
+
+            <div class="input-bar">
+                <input type="text" id="user-input" placeholder="Join the discussion..." disabled>
+                <button id="send-btn" disabled>Send</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
 </body>
 </html>
