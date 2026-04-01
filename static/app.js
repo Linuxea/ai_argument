@@ -195,6 +195,11 @@ class DebateApp {
             this.eventSource.close();
             this.eventSource = null;
             this.addSystemMessage(`Debate ended: ${data.reason}`);
+
+            // Auto-trigger judge when debate ends naturally (max rounds reached)
+            if (data.reason === 'Max rounds reached') {
+                this.requestJudge();
+            }
         });
 
         this.eventSource.addEventListener('judge_chunk', (e) => {
@@ -262,7 +267,6 @@ class DebateApp {
 
         this.messages.appendChild(message);
         this.currentMessageEl = content;
-        this.scrollToBottom();
     }
 
     appendToMessage(text) {
@@ -271,7 +275,6 @@ class DebateApp {
             const raw = (this.currentMessageEl.dataset.raw || '') + text;
             this.currentMessageEl.dataset.raw = raw;
             this.currentMessageEl.innerHTML = marked.parse(raw);
-            this.scrollToBottom();
         }
     }
 
