@@ -168,7 +168,8 @@ Messages appear in chronological order as a timeline, like a group chat:
 | `POST` | `/api/debate/start` | Start debate (body: topic, debater names) |
 | `GET` | `/api/debate/stream` | SSE endpoint for live messages |
 | `POST` | `/api/debate/message` | Inject user message (body: message text) |
-| `POST` | `/api/debate/stop` | Stop the debate |
+| `POST` | `/api/debate/stop` | Stop/pause the debate |
+| `POST` | `/api/debate/resume` | Resume a paused debate |
 | `POST` | `/api/debate/judge` | Request judge's analysis |
 | `POST` | `/api/debaters` | Create custom debater (body: name, color, avatar, stance, personality) |
 
