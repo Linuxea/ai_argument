@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, Literal
 
 
@@ -8,6 +8,14 @@ class Debater(BaseModel):
     avatar: str = "💬"
     stance: Literal["for", "against", "neutral"] = "neutral"
     personality: str
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, v: str) -> str:
+        import re
+        if not re.match(r"^#[0-9a-fA-F]{6}$", v):
+            raise ValueError("color must be a 6-digit hex color (e.g. #ff6600)")
+        return v
 
 
 class DebateConfig(BaseModel):

@@ -93,7 +93,7 @@ async def debate_stream():
                     data = json.dumps(event.payload)
                     yield f"event: {event.type}\ndata: {data}\n\n"
 
-                    if event.type == "debate_end":
+                    if event.type in ("debate_end", "judge_result"):
                         break
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
@@ -109,7 +109,7 @@ async def debate_stream():
 @app.post("/api/debate/message")
 async def inject_message(msg: UserMessage):
     """Inject a user message into the debate."""
-    if not debate_engine or not debate_engine.state:
+    if not debate_engine or not debate_engine.state or not debate_engine.state.active:
         raise HTTPException(status_code=400, detail="No active debate")
 
     debate_engine.inject_message(msg.message)
@@ -170,6 +170,10 @@ async def update_settings(api_settings: ApiSettings):
 async def create_debater(request: CustomDebaterRequest):
     """Create a custom debater."""
     global custom_debaters
+
+    all_debaters = load_presets() + custom_debaters
+    if any(d.name == request.name for d in all_debaters):
+        raise HTTPException(status_code=409, detail="Debater name already exists")
 
     debater = Debater(
         name=request.name,

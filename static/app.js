@@ -86,12 +86,29 @@ class DebateApp {
         debaters.forEach(debater => {
             const item = document.createElement('div');
             item.className = 'debater-item';
-            item.innerHTML = `
-                <input type="checkbox" id="debater-${debater.name}" value="${debater.name}">
-                <span class="debater-avatar">${debater.avatar}</span>
-                <span class="debater-name">${debater.name}</span>
-                <span class="debater-stance" style="color: ${debater.color}">${debater.stance}</span>
-            `;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `debater-${CSS.escape(debater.name)}`;
+            checkbox.value = debater.name;
+
+            const avatar = document.createElement('span');
+            avatar.className = 'debater-avatar';
+            avatar.textContent = debater.avatar;
+
+            const name = document.createElement('span');
+            name.className = 'debater-name';
+            name.textContent = debater.name;
+
+            const stance = document.createElement('span');
+            stance.className = 'debater-stance';
+            stance.style.color = this.sanitizeColor(debater.color);
+            stance.textContent = debater.stance;
+
+            item.appendChild(checkbox);
+            item.appendChild(avatar);
+            item.appendChild(name);
+            item.appendChild(stance);
             this.debaterList.appendChild(item);
         });
     }
@@ -215,17 +232,34 @@ class DebateApp {
 
         const time = new Date().toLocaleTimeString();
 
-        message.innerHTML = `
-            <div class="message-header">
-                <span class="message-avatar">${avatar}</span>
-                <span class="message-sender" style="color: ${color}">${name}</span>
-                <span class="message-time">${time}</span>
-            </div>
-            <div class="message-content"></div>
-        `;
+        const header = document.createElement('div');
+        header.className = 'message-header';
+
+        const avatarEl = document.createElement('span');
+        avatarEl.className = 'message-avatar';
+        avatarEl.textContent = avatar;
+
+        const senderEl = document.createElement('span');
+        senderEl.className = 'message-sender';
+        senderEl.style.color = this.sanitizeColor(color);
+        senderEl.textContent = name;
+
+        const timeEl = document.createElement('span');
+        timeEl.className = 'message-time';
+        timeEl.textContent = time;
+
+        header.appendChild(avatarEl);
+        header.appendChild(senderEl);
+        header.appendChild(timeEl);
+
+        const content = document.createElement('div');
+        content.className = 'message-content';
+
+        message.appendChild(header);
+        message.appendChild(content);
 
         this.messages.appendChild(message);
-        this.currentMessageEl = message.querySelector('.message-content');
+        this.currentMessageEl = content;
         this.scrollToBottom();
     }
 
@@ -240,9 +274,9 @@ class DebateApp {
     }
 
     finalizeMessage() {
-        if (this.currentMessageEl && this.currentMessageEl.dataset.raw) {
-            // Final render with complete text
-            this.currentMessageEl.innerHTML = marked.parse(this.currentMessageEl.dataset.raw);
+        if (this.currentMessageEl) {
+            const raw = this.currentMessageEl.dataset.raw || '';
+            this.currentMessageEl.innerHTML = marked.parse(raw);
         }
         this.currentMessageEl = null;
     }
@@ -251,10 +285,11 @@ class DebateApp {
         const message = document.createElement('div');
         message.className = 'message system';
 
-        message.innerHTML = `
-            <div class="message-content">${text}</div>
-        `;
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.textContent = text;
 
+        message.appendChild(content);
         this.messages.appendChild(message);
         this.scrollToBottom();
     }
@@ -282,6 +317,10 @@ class DebateApp {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    sanitizeColor(color) {
+        return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#333333';
     }
 
     scrollToBottom() {

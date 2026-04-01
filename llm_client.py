@@ -1,3 +1,4 @@
+import asyncio
 from openai import AsyncOpenAI
 from typing import AsyncGenerator
 
@@ -21,6 +22,8 @@ class LLMClient:
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             # Yield error as content so frontend can display it
             yield f"[Error: {str(e)}]"

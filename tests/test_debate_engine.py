@@ -21,7 +21,8 @@ def test_build_messages_starts_with_system_and_topic():
     messages = engine.build_messages(debater)
 
     assert messages[0]["role"] == "system"
-    assert messages[0]["content"] == "You are a test debater."
+    assert "You are a test debater." in messages[0]["content"]
+    assert "multi-party debate" in messages[0]["content"]
     assert messages[1]["role"] == "user"
     assert "Should AI replace teachers?" in messages[1]["content"]
 

@@ -66,6 +66,10 @@ You are a participant in a multi-party debate. Follow these rules:
         if max_rounds is not None and max_rounds <= 0:
             raise ValueError("max_rounds must be greater than 0")
 
+        # Cancel any running loop task to prevent ghost tasks
+        if self._loop_task and not self._loop_task.done():
+            self._loop_task.cancel()
+
         self.state = DebateState(
             topic=topic,
             debaters=debaters,
@@ -152,7 +156,9 @@ You are a participant in a multi-party debate. Follow these rules:
                 }
             ))
 
-        self.state.history.append(Message(speaker=debater.name, content=full_text))
+        # Only add to history if not an error response
+        if not full_text.startswith("[Error:"):
+            self.state.history.append(Message(speaker=debater.name, content=full_text))
 
         await self.event_queue.put(Event(
             type="debater_end",
@@ -205,7 +211,7 @@ You are a participant in a multi-party debate. Follow these rules:
         Returns:
             bool: True if message was added, False if no active debate state.
         """
-        if self.state:
+        if self.state and self.state.active:
             self.state.history.append(Message(speaker="You", content=message))
             return True
         return False
