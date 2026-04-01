@@ -53,6 +53,7 @@ You are a participant in a multi-party debate. Follow these rules:
         self.llm = llm_client
         self.state: Optional[DebateState] = None
         self.event_queue: asyncio.Queue = asyncio.Queue()
+        self._loop_task: Optional[asyncio.Task] = None
 
     def start(self, topic: str, debaters: list[Debater], max_rounds: Optional[int] = None):
         """Initialize a new debate.
@@ -71,25 +72,55 @@ You are a participant in a multi-party debate. Follow these rules:
             max_rounds=max_rounds
         )
         self.event_queue = asyncio.Queue()
+        self._loop_task = None
+
+    def ensure_loop_running(self):
+        """Start the debate loop if state is active and loop isn't already running.
+
+        Called by the SSE endpoint to ensure the loop starts only after the
+        SSE consumer is connected, preventing early events from being lost.
+        """
+        if self.state and self.state.active and self._loop_task is None:
+            self._loop_task = asyncio.create_task(self._run_loop_and_cleanup())
+
+    async def _run_loop_and_cleanup(self):
+        """Run the debate loop and clean up the task reference when done."""
+        try:
+            await self.run_loop()
+        finally:
+            self._loop_task = None
 
     def build_messages(self, debater: Debater) -> list[dict]:
         """Build the messages array for a specific debater's API call."""
         system_prompt = f"{self.DEBATE_RULES}\n\n---\n\n{debater.personality}"
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Debate topic: {self.state.topic}"}
         ]
 
-        for msg in self.state.history:
-            if msg.speaker == debater.name:
-                # This debater's own past responses
-                messages.append({"role": "assistant", "content": msg.content})
-            else:
-                # Other speakers (including user)
-                messages.append({
-                    "role": "user",
-                    "content": f"[{msg.speaker}]: {msg.content}"
-                })
+        if not self.state.history:
+            # First turn of the debate — no prior arguments exist.
+            # Instruct the debater to give an opening statement, NOT a rebuttal.
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"You are the first speaker. "
+                    f"No one has spoken yet — do NOT reference or quote anyone. "
+                    f"Present your opening argument on the topic: {self.state.topic}"
+                )
+            })
+        else:
+            messages.append({
+                "role": "user",
+                "content": f"Debate topic: {self.state.topic}"
+            })
+            for msg in self.state.history:
+                if msg.speaker == debater.name:
+                    messages.append({"role": "assistant", "content": msg.content})
+                else:
+                    messages.append({
+                        "role": "user",
+                        "content": f"[{msg.speaker}]: {msg.content}"
+                    })
 
         return messages
 

@@ -71,7 +71,6 @@ async def start_debate(config: DebateConfig):
         raise HTTPException(status_code=400, detail="Invalid debater name")
 
     debate_engine.start(config.topic, selected, config.max_rounds)
-    asyncio.create_task(debate_engine.run_loop())
 
     return {"status": "started", "topic": config.topic}
 
@@ -80,6 +79,10 @@ async def start_debate(config: DebateConfig):
 async def debate_stream():
     """SSE endpoint for streaming debate events."""
     async def event_generator():
+        # Start debate loop AFTER SSE consumer is connected
+        if debate_engine:
+            debate_engine.ensure_loop_running()
+
         while True:
             if debate_engine and debate_engine.state:
                 try:
@@ -127,7 +130,7 @@ async def resume_debate():
     """Resume a paused debate."""
     if debate_engine and debate_engine.state:
         debate_engine.resume()
-        asyncio.create_task(debate_engine.run_loop())
+        # Loop will be started by SSE endpoint when consumer reconnects
         return {"status": "resumed"}
     raise HTTPException(status_code=400, detail="No debate to resume")
 
