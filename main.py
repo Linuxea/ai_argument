@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from openai import AsyncOpenAI
 
 from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, ApiSettings
 from config import load_presets, settings
@@ -63,9 +64,10 @@ async def start_debate(config: DebateConfig):
     if len(config.debater_names) < 2:
         raise HTTPException(status_code=400, detail="At least 2 debaters required")
 
-    # Get debater objects
+    # Get debater objects, preserving the order from the frontend
     all_debaters = load_presets() + custom_debaters
-    selected = [d for d in all_debaters if d.name in config.debater_names]
+    debater_map = {d.name: d for d in all_debaters}
+    selected = [debater_map[name] for name in config.debater_names if name in debater_map]
 
     if len(selected) != len(config.debater_names):
         raise HTTPException(status_code=400, detail="Invalid debater name")
@@ -158,14 +160,29 @@ async def get_settings():
     }
 
 
+@app.get("/api/models")
+async def list_models():
+    """Fetch available models from the configured API provider."""
+    try:
+        client = AsyncOpenAI(base_url=settings.api_base_url, api_key=settings.api_key)
+        models = await client.models.list()
+        model_ids = sorted([m.id for m in models.data])
+        return {"models": model_ids}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch models: {str(e)}")
+
+
 @app.post("/api/settings")
 async def update_settings(api_settings: ApiSettings):
-    """Update API settings and recreate the LLM client."""
+    """Update API settings and recreate the LLM client. Empty values fall back to defaults."""
     global debate_engine
 
-    settings.api_base_url = api_settings.api_url
-    settings.api_key = api_settings.api_key
-    settings.model = api_settings.model_name
+    if api_settings.api_url:
+        settings.api_base_url = api_settings.api_url
+    if api_settings.api_key:
+        settings.api_key = api_settings.api_key
+    if api_settings.model_name:
+        settings.model = api_settings.model_name
 
     debate_engine.llm = LLMClient(
         base_url=settings.api_base_url,

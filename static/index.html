@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Debate Chatroom</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=7">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -20,7 +21,7 @@
                 <textarea id="topic-input" rows="3" placeholder="Enter a topic for debate..."></textarea>
                 <div class="max-rounds-row">
                     <label for="max-rounds">Max Rounds</label>
-                    <input type="number" id="max-rounds" min="1" max="20" step="1" value="3">
+                    <input type="number" id="max-rounds" min="1" max="20" step="1" value="10">
                 </div>
             </section>
 
@@ -31,9 +32,11 @@
 
             <section class="sidebar-section">
                 <label>API Settings</label>
-                <input type="text" id="api-url" placeholder="API Base URL" value="https://api.deepseek.com">
-                <input type="password" id="api-key" placeholder="API Key" value="">
-                <input type="text" id="model-name" placeholder="Model Name" value="deepseek-chat">
+                <input type="text" id="api-url" placeholder="API URL (default: https://api.deepseek.com)" value="">
+                <input type="password" id="api-key" placeholder="API Key (default: $DEEPSEEK_API_KEY)" value="">
+                <select id="model-name">
+                    <option value="">-- Fetch models via Save --</option>
+                </select>
                 <button id="save-settings-btn">Save Settings</button>
             </section>
 
@@ -76,6 +79,6 @@
         </main>
     </div>
 
-    <script src="/static/app.js?v=5"></script>
+    <script src="/static/app.js?v=8"></script>
 </body>
 </html>

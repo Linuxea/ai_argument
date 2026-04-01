@@ -102,6 +102,7 @@ class DebateApp {
             checkbox.type = 'checkbox';
             checkbox.id = `debater-${CSS.escape(debater.name)}`;
             checkbox.value = debater.name;
+            checkbox.checked = true;
 
             const avatar = document.createElement('span');
             avatar.className = 'debater-avatar';
@@ -174,6 +175,17 @@ class DebateApp {
         }
 
         try {
+            // Sync current settings to backend before starting
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_url: this.apiUrl.value,
+                    api_key: this.apiKey.value,
+                    model_name: this.modelName.value
+                })
+            });
+
             // Clear messages
             this.messages.innerHTML = '';
             this.chatTitle.textContent = topic;
@@ -621,6 +633,14 @@ ${body}
     }
 
     async loadSettings() {
+        // Clear stale defaults from previous versions
+        const staleDefaults = ['http://localhost:11434/v1', 'ollama', 'llama3'];
+        ['api_url', 'api_key', 'model_name'].forEach((key, i) => {
+            if (localStorage.getItem(key) === staleDefaults[i]) {
+                localStorage.removeItem(key);
+            }
+        });
+
         const apiUrl = localStorage.getItem('api_url');
         const apiKey = localStorage.getItem('api_key');
         const modelName = localStorage.getItem('model_name');
@@ -631,28 +651,18 @@ ${body}
         if (modelName) this.modelName.value = modelName;
         if (maxRounds) this.maxRoundsInput.value = maxRounds;
 
-        // Sync cached settings to backend, or fetch defaults from backend
+        // Sync cached settings to backend on reload
         if (apiUrl || apiKey || modelName) {
             fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    api_url: this.apiUrl.value,
-                    api_key: this.apiKey.value,
-                    model_name: this.modelName.value
+                    api_url: apiUrl,
+                    api_key: apiKey,
+                    model_name: modelName
                 })
-            }).catch(err => console.error('Failed to sync settings:', err));
-        } else {
-            // First visit — load defaults from backend (e.g. API key from env var)
-            try {
-                const resp = await fetch('/api/settings');
-                const data = await resp.json();
-                if (data.api_url) this.apiUrl.value = data.api_url;
-                if (data.api_key) this.apiKey.value = data.api_key;
-                if (data.model_name) this.modelName.value = data.model_name;
-            } catch (err) {
-                console.error('Failed to load default settings:', err);
-            }
+            }).then(() => this.fetchModels())
+              .catch(err => console.error('Failed to sync settings:', err));
         }
     }
 
@@ -679,10 +689,39 @@ ${body}
             localStorage.setItem('model_name', this.modelName.value);
             localStorage.setItem('max_rounds', this.maxRoundsInput.value);
 
+            // Fetch available models and populate dropdown
+            await this.fetchModels();
+
             alert('Settings saved and applied.');
         } catch (error) {
             console.error('Failed to save settings:', error);
             alert(error.message);
+        }
+    }
+
+    async fetchModels() {
+        try {
+            const resp = await fetch('/api/models');
+            if (!resp.ok) {
+                const err = await resp.json();
+                console.error('Failed to fetch models:', err.detail);
+                return;
+            }
+            const data = await resp.json();
+            const current = this.modelName.value;
+            this.modelName.innerHTML = '';
+            data.models.forEach(id => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = id;
+                if (id === current) opt.selected = true;
+                this.modelName.appendChild(opt);
+            });
+            if (!current && data.models.length > 0) {
+                this.modelName.value = data.models[0];
+            }
+        } catch (err) {
+            console.error('Failed to fetch models:', err);
         }
     }
 }
