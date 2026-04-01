@@ -1,3 +1,4 @@
+import os
 import yaml
 from pathlib import Path
 from models import Debater
@@ -14,16 +15,16 @@ def load_presets() -> list[Debater]:
 
 
 class Settings:
-    """Application settings with defaults for Ollama."""
+    """Application settings with defaults for DeepSeek."""
 
     def __init__(
         self,
-        api_base_url: str = "http://localhost:11434/v1",
-        api_key: str = "ollama",
-        model: str = "llama3",
+        api_base_url: str = "https://api.deepseek.com",
+        api_key: str = None,
+        model: str = "deepseek-chat",
     ):
         self.api_base_url = api_base_url
-        self.api_key = api_key
+        self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
         self.model = model
 
 

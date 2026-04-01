@@ -148,6 +148,16 @@ async def judge_debate():
     return {"status": "judging"}
 
 
+@app.get("/api/settings")
+async def get_settings():
+    """Return current API settings."""
+    return {
+        "api_url": settings.api_base_url,
+        "api_key": settings.api_key,
+        "model_name": settings.model,
+    }
+
+
 @app.post("/api/settings")
 async def update_settings(api_settings: ApiSettings):
     """Update API settings and recreate the LLM client."""

@@ -87,10 +87,16 @@ class DebateApp {
 
     renderDebaters(debaters) {
         this.debaterList.innerHTML = '';
+        this._draggedItem = null;
 
         debaters.forEach(debater => {
             const item = document.createElement('div');
             item.className = 'debater-item';
+            item.draggable = true;
+
+            const handle = document.createElement('span');
+            handle.className = 'drag-handle';
+            handle.textContent = '⠿';
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
@@ -110,11 +116,47 @@ class DebateApp {
             stance.style.color = this.sanitizeColor(debater.color);
             stance.textContent = debater.stance;
 
+            item.appendChild(handle);
             item.appendChild(checkbox);
             item.appendChild(avatar);
             item.appendChild(name);
             item.appendChild(stance);
             this.debaterList.appendChild(item);
+
+            // Drag-and-drop: reorder debaters to control turn order
+            item.addEventListener('dragstart', () => {
+                this._draggedItem = item;
+                item.classList.add('dragging');
+            });
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+                this._clearDragOver();
+                this._draggedItem = null;
+            });
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (!this._draggedItem || this._draggedItem === item) return;
+                this._clearDragOver();
+                const rect = item.getBoundingClientRect();
+                const mid = rect.top + rect.height / 2;
+                if (e.clientY < mid) {
+                    item.classList.add('drag-over-top');
+                } else {
+                    item.classList.add('drag-over-bottom');
+                }
+            });
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (!this._draggedItem || this._draggedItem === item) return;
+                const rect = item.getBoundingClientRect();
+                const mid = rect.top + rect.height / 2;
+                if (e.clientY < mid) {
+                    this.debaterList.insertBefore(this._draggedItem, item);
+                } else {
+                    this.debaterList.insertBefore(this._draggedItem, item.nextSibling);
+                }
+                this._clearDragOver();
+            });
         });
     }
 
@@ -166,6 +208,12 @@ class DebateApp {
     getSelectedDebaters() {
         const checkboxes = this.debaterList.querySelectorAll('input[type="checkbox"]:checked');
         return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    _clearDragOver() {
+        this.debaterList.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+            el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
     }
 
     connectSSE() {
@@ -275,17 +323,16 @@ class DebateApp {
 
     appendToMessage(text) {
         if (this.currentMessageEl) {
-            // Store raw text on the element, render as markdown each time
             const raw = (this.currentMessageEl.dataset.raw || '') + text;
             this.currentMessageEl.dataset.raw = raw;
-            this.currentMessageEl.innerHTML = marked.parse(raw);
+            this.currentMessageEl.innerHTML = this.renderContent(raw);
         }
     }
 
     finalizeMessage() {
         if (this.currentMessageEl) {
             const raw = this.currentMessageEl.dataset.raw || '';
-            this.currentMessageEl.innerHTML = marked.parse(raw);
+            this.currentMessageEl.innerHTML = this.renderContent(raw);
         }
         this.currentMessageEl = null;
     }
@@ -330,6 +377,12 @@ class DebateApp {
 
     sanitizeColor(color) {
         return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#333333';
+    }
+
+    renderContent(raw) {
+        const html = marked.parse(raw);
+        // Replace [[Name]] with highlighted mention badges
+        return html.replace(/\[\[([^\]]+)\]\]/g, '<span class="mention">$1</span>');
     }
 
     scrollToBottom() {
@@ -567,7 +620,7 @@ ${body}
         }
     }
 
-    loadSettings() {
+    async loadSettings() {
         const apiUrl = localStorage.getItem('api_url');
         const apiKey = localStorage.getItem('api_key');
         const modelName = localStorage.getItem('model_name');
@@ -578,7 +631,7 @@ ${body}
         if (modelName) this.modelName.value = modelName;
         if (maxRounds) this.maxRoundsInput.value = maxRounds;
 
-        // Sync cached settings to backend on page load
+        // Sync cached settings to backend, or fetch defaults from backend
         if (apiUrl || apiKey || modelName) {
             fetch('/api/settings', {
                 method: 'POST',
@@ -589,6 +642,17 @@ ${body}
                     model_name: this.modelName.value
                 })
             }).catch(err => console.error('Failed to sync settings:', err));
+        } else {
+            // First visit — load defaults from backend (e.g. API key from env var)
+            try {
+                const resp = await fetch('/api/settings');
+                const data = await resp.json();
+                if (data.api_url) this.apiUrl.value = data.api_url;
+                if (data.api_key) this.apiKey.value = data.api_key;
+                if (data.model_name) this.modelName.value = data.model_name;
+            } catch (err) {
+                console.error('Failed to load default settings:', err);
+            }
         }
     }
 
