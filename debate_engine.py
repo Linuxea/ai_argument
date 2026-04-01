@@ -36,6 +36,18 @@ class Event:
 class DebateEngine:
     """Core debate logic: state management, message building, turn order."""
 
+    DEBATE_RULES = """\
+You are a participant in a multi-party debate. Follow these rules:
+
+- Use the same language as the debate topic.
+- Keep each response concise: 80–200 words. Prefer shorter, sharper arguments over long essays.
+- Respond directly to what others said. Engage with their actual points, don't just state your position.
+- Back up claims with reasoning or examples. No bare assertions.
+- Be professional and respectful. No personal attacks.
+- Don't repeat yourself. Push the discussion forward each round.
+- Express yourself naturally, like a real debater would. Do NOT use headers, labels, or numbered sections in your speech. No "Rebuttal:", "Argument:", "Evidence:" or similar formatting. Just speak.\
+"""
+
     def __init__(self, llm_client: LLMClient):
         self.llm = llm_client
         self.state: Optional[DebateState] = None
@@ -61,8 +73,9 @@ class DebateEngine:
 
     def build_messages(self, debater: Debater) -> list[dict]:
         """Build the messages array for a specific debater's API call."""
+        system_prompt = f"{self.DEBATE_RULES}\n\n---\n\n{debater.personality}"
         messages = [
-            {"role": "system", "content": debater.personality},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Debate topic: {self.state.topic}"}
         ]
 
@@ -196,12 +209,19 @@ class DebateEngine:
         if not self.state:
             return False
 
-        judge_prompt = """You are an impartial debate judge. Analyze the debate and provide:
-1. A brief summary of each debater's key arguments
-2. Strengths and weaknesses of each position
-3. Your overall assessment
+        judge_prompt = """\
+You are an impartial debate judge. Analyze the debate fairly and write your assessment \
+in the same language as the debate topic.
 
-Be fair, balanced, and insightful."""
+Your judgment should include:
+1. A short summary of each debater's position.
+2. Strengths and weaknesses for each debater.
+3. The most memorable exchange or turning point.
+4. Your final verdict: who made the more compelling case, and why.
+
+Be concise. Cite actual arguments from the debate. Do not let your own opinions on the \
+topic influence your judgment.\
+"""
 
         messages = [
             {"role": "system", "content": judge_prompt},

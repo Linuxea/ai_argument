@@ -20,6 +20,12 @@ class UserMessage(BaseModel):
     message: str
 
 
+class ApiSettings(BaseModel):
+    api_url: str
+    api_key: str
+    model_name: str
+
+
 class CustomDebaterRequest(BaseModel):
     name: str
     color: str = "#333333"

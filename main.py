@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest
+from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, ApiSettings
 from config import load_presets, settings
 from llm_client import LLMClient
 from debate_engine import DebateEngine
@@ -140,6 +140,24 @@ async def judge_debate():
 
     asyncio.create_task(debate_engine.judge())
     return {"status": "judging"}
+
+
+@app.post("/api/settings")
+async def update_settings(api_settings: ApiSettings):
+    """Update API settings and recreate the LLM client."""
+    global debate_engine
+
+    settings.api_base_url = api_settings.api_url
+    settings.api_key = api_settings.api_key
+    settings.model = api_settings.model_name
+
+    debate_engine.llm = LLMClient(
+        base_url=settings.api_base_url,
+        api_key=settings.api_key,
+        model=settings.model
+    )
+
+    return {"status": "updated"}
 
 
 @app.post("/api/debaters")

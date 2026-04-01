@@ -232,6 +232,10 @@ class DebateApp {
     }
 
     finalizeMessage() {
+        if (this.currentMessageEl) {
+            const raw = this.currentMessageEl.textContent;
+            this.currentMessageEl.innerHTML = marked.parse(raw);
+        }
         this.currentMessageEl = null;
     }
 
@@ -454,14 +458,48 @@ class DebateApp {
         if (apiUrl) this.apiUrl.value = apiUrl;
         if (apiKey) this.apiKey.value = apiKey;
         if (modelName) this.modelName.value = modelName;
+
+        // Sync cached settings to backend on page load
+        if (apiUrl || apiKey || modelName) {
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_url: this.apiUrl.value,
+                    api_key: this.apiKey.value,
+                    model_name: this.modelName.value
+                })
+            }).catch(err => console.error('Failed to sync settings:', err));
+        }
     }
 
-    saveSettings() {
-        localStorage.setItem('api_url', this.apiUrl.value);
-        localStorage.setItem('api_key', this.apiKey.value);
-        localStorage.setItem('model_name', this.modelName.value);
+    async saveSettings() {
+        try {
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_url: this.apiUrl.value,
+                    api_key: this.apiKey.value,
+                    model_name: this.modelName.value
+                })
+            });
 
-        alert('Settings saved. Note: Server restart required for changes to take effect.');
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save settings');
+            }
+
+            // Also cache to localStorage for page reloads
+            localStorage.setItem('api_url', this.apiUrl.value);
+            localStorage.setItem('api_key', this.apiKey.value);
+            localStorage.setItem('model_name', this.modelName.value);
+
+            alert('Settings saved and applied.');
+        } catch (error) {
+            console.error('Failed to save settings:', error);
+            alert(error.message);
+        }
     }
 }
 
