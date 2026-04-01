@@ -94,9 +94,20 @@ You are a participant in a multi-party debate. Follow these rules:
         finally:
             self._loop_task = None
 
+    STANCE_INSTRUCTIONS = {
+        "for": "You support the topic. Argue in favor of it.",
+        "against": "You oppose the topic. Argue against it.",
+        "neutral": "You take a balanced view. Weigh evidence from both sides.",
+    }
+
     def build_messages(self, debater: Debater) -> list[dict]:
         """Build the messages array for a specific debater's API call."""
-        system_prompt = f"{self.DEBATE_RULES}\n\n---\n\n{debater.personality}"
+        stance_instruction = self.STANCE_INSTRUCTIONS.get(debater.stance, self.STANCE_INSTRUCTIONS["neutral"])
+        system_prompt = (
+            f"{self.DEBATE_RULES}\n\n---\n\n"
+            f"Your stance: {stance_instruction}\n\n"
+            f"---\n\n{debater.personality}"
+        )
         messages = [
             {"role": "system", "content": system_prompt},
         ]
