@@ -193,6 +193,11 @@ class DebateApp {
         this.eventSource.addEventListener('judge_result', (e) => {
             const data = JSON.parse(e.data);
             this.finalizeMessage();
+            // Judge is done — close SSE connection
+            if (this.eventSource) {
+                this.eventSource.close();
+                this.eventSource = null;
+            }
         });
 
         this.eventSource.onerror = (e) => {
@@ -226,15 +231,18 @@ class DebateApp {
 
     appendToMessage(text) {
         if (this.currentMessageEl) {
-            this.currentMessageEl.textContent += text;
+            // Store raw text on the element, render as markdown each time
+            const raw = (this.currentMessageEl.dataset.raw || '') + text;
+            this.currentMessageEl.dataset.raw = raw;
+            this.currentMessageEl.innerHTML = marked.parse(raw);
             this.scrollToBottom();
         }
     }
 
     finalizeMessage() {
-        if (this.currentMessageEl) {
-            const raw = this.currentMessageEl.textContent;
-            this.currentMessageEl.innerHTML = marked.parse(raw);
+        if (this.currentMessageEl && this.currentMessageEl.dataset.raw) {
+            // Final render with complete text
+            this.currentMessageEl.innerHTML = marked.parse(this.currentMessageEl.dataset.raw);
         }
         this.currentMessageEl = null;
     }
@@ -351,7 +359,9 @@ class DebateApp {
                 throw new Error(error.detail || 'Failed to request judge');
             }
 
-            // Judge response will come through SSE
+            // Reconnect SSE to receive judge events
+            // (previous SSE was closed when debate ended)
+            this.connectSSE();
 
         } catch (error) {
             console.error('Failed to request judge:', error);
