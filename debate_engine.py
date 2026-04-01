@@ -42,7 +42,16 @@ class DebateEngine:
         self.event_queue: asyncio.Queue = asyncio.Queue()
 
     def start(self, topic: str, debaters: list[Debater], max_rounds: Optional[int] = None):
-        """Initialize a new debate."""
+        """Initialize a new debate.
+
+        Raises:
+            ValueError: If debaters list is empty or max_rounds is not positive.
+        """
+        if not debaters:
+            raise ValueError("debaters list cannot be empty")
+        if max_rounds is not None and max_rounds <= 0:
+            raise ValueError("max_rounds must be greater than 0")
+
         self.state = DebateState(
             topic=topic,
             debaters=debaters,
@@ -145,25 +154,47 @@ class DebateEngine:
                 payload={"reason": "Stopped by user"}
             ))
 
-    def inject_message(self, message: str):
-        """Add a user message to the debate history."""
+    def inject_message(self, message: str) -> bool:
+        """Add a user message to the debate history.
+
+        Returns:
+            bool: True if message was added, False if no active debate state.
+        """
         if self.state:
             self.state.history.append(Message(speaker="You", content=message))
+            return True
+        return False
 
-    def stop(self):
-        """Pause the debate."""
+    def stop(self) -> bool:
+        """Pause the debate.
+
+        Returns:
+            bool: True if debate was stopped, False if no active debate state.
+        """
         if self.state:
             self.state.active = False
+            return True
+        return False
 
-    def resume(self):
-        """Resume a paused debate."""
+    def resume(self) -> bool:
+        """Resume a paused debate.
+
+        Returns:
+            bool: True if debate was resumed, False if no active debate state.
+        """
         if self.state:
             self.state.active = True
+            return True
+        return False
 
-    async def judge(self):
-        """Generate a judge's analysis of the debate."""
+    async def judge(self) -> bool:
+        """Generate a judge's analysis of the debate.
+
+        Returns:
+            bool: True if judgment was generated, False if no active debate state.
+        """
         if not self.state:
-            return
+            return False
 
         judge_prompt = """You are an impartial debate judge. Analyze the debate and provide:
 1. A brief summary of each debater's key arguments
@@ -195,3 +226,4 @@ Be fair, balanced, and insightful."""
             type="judge_result",
             payload={"judgment_text": full_text}
         ))
+        return True
