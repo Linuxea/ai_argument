@@ -95,8 +95,8 @@ You are a participant in a multi-party debate. Follow these rules:
             self._loop_task = None
 
     STANCE_INSTRUCTIONS = {
-        "for": "You support the topic. Argue in favor of it.",
-        "against": "You oppose the topic. Argue against it.",
+        "for": "You support the topic. Argue in favor of it. Focus on rebutting arguments from the opposing side — find their flaws, press hard, and do not let weak points slide.",
+        "against": "You oppose the topic. Argue against it. Focus on rebutting arguments from the supporting side — find their flaws, press hard, and do not let weak points slide.",
         "neutral": "You take a balanced view. Weigh evidence from both sides.",
     }
 
