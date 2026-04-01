@@ -17,6 +17,7 @@ class DebateApp {
     bindElements() {
         // Topic input
         this.topicInput = document.getElementById('topic-input');
+        this.maxRoundsInput = document.getElementById('max-rounds');
 
         // Debater list
         this.debaterList = document.getElementById('debater-list');
@@ -137,7 +138,8 @@ class DebateApp {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     topic: topic,
-                    debater_names: selectedDebaters
+                    debater_names: selectedDebaters,
+                    max_rounds: parseInt(this.maxRoundsInput.value) || 3
                 })
             });
 
@@ -503,10 +505,12 @@ class DebateApp {
         const apiUrl = localStorage.getItem('api_url');
         const apiKey = localStorage.getItem('api_key');
         const modelName = localStorage.getItem('model_name');
+        const maxRounds = localStorage.getItem('max_rounds');
 
         if (apiUrl) this.apiUrl.value = apiUrl;
         if (apiKey) this.apiKey.value = apiKey;
         if (modelName) this.modelName.value = modelName;
+        if (maxRounds) this.maxRoundsInput.value = maxRounds;
 
         // Sync cached settings to backend on page load
         if (apiUrl || apiKey || modelName) {
@@ -543,6 +547,7 @@ class DebateApp {
             localStorage.setItem('api_url', this.apiUrl.value);
             localStorage.setItem('api_key', this.apiKey.value);
             localStorage.setItem('model_name', this.modelName.value);
+            localStorage.setItem('max_rounds', this.maxRoundsInput.value);
 
             alert('Settings saved and applied.');
         } catch (error) {

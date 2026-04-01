@@ -103,11 +103,32 @@ You are a participant in a multi-party debate. Follow these rules:
     def build_messages(self, debater: Debater) -> list[dict]:
         """Build the messages array for a specific debater's API call."""
         stance_instruction = self.STANCE_INSTRUCTIONS.get(debater.stance, self.STANCE_INSTRUCTIONS["neutral"])
+
+        # Build round countdown context
+        countdown = ""
+        if self.state.max_rounds:
+            current = self.state.current_round + 1
+            remaining = self.state.max_rounds - self.state.current_round
+            if remaining <= 1:
+                countdown = (
+                    f"This is round {current} of {self.state.max_rounds} — "
+                    f"FINAL ROUND. Make your strongest closing argument. No holding back."
+                )
+            else:
+                countdown = (
+                    f"This is round {current} of {self.state.max_rounds}. "
+                    f"There {'is' if remaining - 1 == 1 else 'are'} {remaining - 1} "
+                    f"round{'s' if remaining - 1 != 1 else ''} remaining after this one."
+                )
+
         system_prompt = (
             f"{self.DEBATE_RULES}\n\n---\n\n"
             f"Your stance: {stance_instruction}\n\n"
-            f"---\n\n{debater.personality}"
+            f"---\n\n"
+            f"{debater.personality}"
         )
+        if countdown:
+            system_prompt += f"\n\n---\n\n{countdown}"
         messages = [
             {"role": "system", "content": system_prompt},
         ]

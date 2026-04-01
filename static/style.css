@@ -124,6 +124,7 @@ body {
 
 input[type="text"],
 input[type="password"],
+input[type="number"],
 textarea,
 select {
     background: var(--bg-input);
@@ -138,6 +139,7 @@ select {
 
 input[type="text"]:focus,
 input[type="password"]:focus,
+input[type="number"]:focus,
 textarea:focus,
 select:focus {
     outline: none;
@@ -176,6 +178,30 @@ input[type="color"]::-webkit-color-swatch { border-radius: 4px; border: none; }
     align-items: center;
 }
 .inline-inputs input[type="text"] { flex: 1; }
+
+/* Max rounds spinner */
+.max-rounds-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.max-rounds-row label {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.max-rounds-row input[type="number"] {
+    width: 72px;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+.max-rounds-row input[type="number"]::-webkit-inner-spin-button,
+.max-rounds-row input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    height: 28px;
+}
 
 /* ─── Buttons ───────────────────────────────────────── */
 
