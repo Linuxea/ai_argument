@@ -47,6 +47,7 @@ class DebateApp {
         this.userInput = document.getElementById('user-input');
         this.sendBtn = document.getElementById('send-btn');
         this.judgeBtn = document.getElementById('judge-btn');
+        this.downloadBtn = document.getElementById('download-btn');
     }
 
     bindEventListeners() {
@@ -69,6 +70,9 @@ class DebateApp {
 
         // Judge
         this.judgeBtn.addEventListener('click', () => this.requestJudge());
+
+        // Download
+        this.downloadBtn.addEventListener('click', () => this.downloadChat());
     }
 
     async loadDebaters() {
@@ -413,6 +417,62 @@ class DebateApp {
         }
     }
 
+    downloadChat() {
+        const topic = this.chatTitle.textContent;
+        const msgEls = this.messages.querySelectorAll('.message');
+        if (msgEls.length === 0) {
+            alert('No messages to download.');
+            return;
+        }
+
+        let body = '';
+        msgEls.forEach(el => {
+            if (el.classList.contains('system')) {
+                const text = el.querySelector('.message-content')?.textContent || '';
+                body += `<div class="sys-msg">${this.escapeHtml(text)}</div>\n`;
+            } else {
+                const avatar = el.querySelector('.message-avatar')?.textContent || '';
+                const sender = el.querySelector('.message-sender')?.textContent || '';
+                const color = el.querySelector('.message-sender')?.style.color || '#333';
+                const time = el.querySelector('.message-time')?.textContent || '';
+                const content = el.querySelector('.message-content')?.innerHTML || '';
+                const isUser = el.classList.contains('user');
+                const cls = isUser ? 'user-msg' : 'debater-msg';
+                body += `<div class="${cls}">
+  <div class="msg-header"><span class="avatar">${avatar}</span> <span class="sender" style="color:${color}">${this.escapeHtml(sender)}</span> <span class="time">${time}</span></div>
+  <div class="msg-body">${content}</div>
+</div>\n`;
+            }
+        });
+
+        const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>${this.escapeHtml(topic)}</title>
+<style>
+  body{font-family:'Outfit',system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;background:#f5f1ea;color:#1a1714;line-height:1.7}
+  h1{font-family:'Playfair Display',Georgia,serif;font-size:1.4rem;text-align:center;padding-bottom:16px;border-bottom:2px solid #c0503a;margin-bottom:28px}
+  .debater-msg,.user-msg{margin-bottom:22px}
+  .msg-header{font-size:.82rem;margin-bottom:4px}
+  .msg-header .avatar{font-size:1rem}
+  .msg-header .sender{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:.78rem;letter-spacing:.04em}
+  .msg-header .time{color:#9a9183;font-size:.72rem;margin-left:6px}
+  .msg-body{background:#fff;padding:14px 18px;border-radius:12px;border-left:3px solid #c0503a;box-shadow:0 1px 3px rgba(80,65,40,.06);font-size:.93rem}
+  .user-msg .msg-body{border-left-color:#2d3e50;background:linear-gradient(135deg,rgba(45,62,80,.07),#fff)}
+  .sys-msg{text-align:center;color:#9a9183;font-style:italic;font-size:.84rem;margin:12px 0}
+  .sys-msg::before,.sys-msg::after{content:' — ';color:#ddd7cc}
+</style></head><body>
+<h1>${this.escapeHtml(topic)}</h1>
+${body}
+</body></html>`;
+
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `debate-${Date.now()}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
     async addCustomDebater() {
         const name = this.customName.value.trim();
         const color = this.customColor.value;
@@ -482,6 +542,7 @@ class DebateApp {
                 this.userInput.disabled = false;
                 this.sendBtn.disabled = false;
                 this.judgeBtn.disabled = true;
+                this.downloadBtn.disabled = false;
                 break;
 
             case 'paused':
@@ -491,6 +552,7 @@ class DebateApp {
                 this.userInput.disabled = true;
                 this.sendBtn.disabled = true;
                 this.judgeBtn.disabled = true;
+                this.downloadBtn.disabled = false;
                 break;
 
             case 'stopped':
@@ -500,6 +562,7 @@ class DebateApp {
                 this.userInput.disabled = true;
                 this.sendBtn.disabled = true;
                 this.judgeBtn.disabled = false;
+                this.downloadBtn.disabled = false;
                 break;
         }
     }

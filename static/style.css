@@ -275,6 +275,23 @@ button:disabled {
     box-shadow: 0 0 12px var(--teal-glow);
 }
 
+/* Download — navy outline */
+#download-btn {
+    background: transparent;
+    border: 1.5px solid var(--navy);
+    color: var(--navy);
+    font-weight: 600;
+    font-size: 0.84rem;
+    padding: 7px 20px;
+    border-radius: var(--radius-lg);
+}
+
+#download-btn:hover:not(:disabled) {
+    background: rgba(45, 62, 80, 0.06);
+    border-color: var(--ink);
+    box-shadow: 0 0 12px rgba(45, 62, 80, 0.08);
+}
+
 /* ─── Debater List ──────────────────────────────────── */
 
 #debater-list {
