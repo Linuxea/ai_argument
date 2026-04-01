@@ -359,7 +359,6 @@ class DebateApp {
 
         message.appendChild(content);
         this.messages.appendChild(message);
-        this.scrollToBottom();
     }
 
     addUserMessage(text) {
@@ -378,7 +377,6 @@ class DebateApp {
         `;
 
         this.messages.appendChild(message);
-        this.scrollToBottom();
     }
 
     escapeHtml(text) {
