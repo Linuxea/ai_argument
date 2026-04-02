@@ -646,7 +646,9 @@ class DebateApp {
                 const sender = el.querySelector('.message-sender')?.textContent || '';
                 const color = el.querySelector('.message-sender')?.style.color || '#333';
                 const time = el.querySelector('.message-time')?.textContent || '';
-                const content = el.querySelector('.message-content')?.innerHTML || '';
+                // Tool cards use .tool-card-content, regular messages use .message-content
+                const content = el.querySelector('.message-content')?.innerHTML ||
+                                el.querySelector('.tool-card-content')?.innerHTML || '';
                 const isUser = el.classList.contains('user');
                 const isToolCard = el.classList.contains('tool-card');
                 const cls = isUser ? 'user-msg' : (isToolCard ? 'tool-msg' : 'debater-msg');
@@ -669,7 +671,7 @@ class DebateApp {
 <style>
   body{font-family:'Outfit',system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;background:${bg};color:${fg};line-height:1.7}
   h1{font-family:'Playfair Display',Georgia,serif;font-size:1.4rem;text-align:center;padding-bottom:16px;border-bottom:2px solid #c0503a;margin-bottom:28px}
-  .debater-msg,.user-msg{margin-bottom:22px}
+  .debater-msg,.user-msg,.tool-msg{margin-bottom:22px}
   .msg-header{font-size:.82rem;margin-bottom:4px}
   .msg-header .avatar{font-size:1rem}
   .msg-header .sender{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:.78rem;letter-spacing:.04em}
@@ -678,7 +680,9 @@ class DebateApp {
   .user-msg .msg-body{border-left-color:#2d3e50;background:${userBg}}
   .sys-msg{text-align:center;color:${muted};font-style:italic;font-size:.84rem;margin:12px 0}
   .sys-msg::before,.sys-msg::after{content:' — ';color:${border}}
-  .tool-msg .msg-body{border-left:1px dashed ${border};background:${bg};font-size:.85rem;color:${muted}}
+  .tool-msg .msg-body{border-left:1px dashed ${border};background:${bg};font-size:.85rem;color:${muted};padding:10px 14px}
+  .tool-card-label{font-weight:500;color:${fg};margin-bottom:8px}
+  .tool-card-results{margin-top:8px;padding:8px 12px;background:${msgBg};border-radius:6px;font-size:.82rem}
 </style></head><body>
 <h1>${this.escapeHtml(topic)}</h1>
 ${body}

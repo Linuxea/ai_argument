@@ -25,47 +25,56 @@ SEARCH_INSTRUCTIONS = """\
 
 You have access to a `web_search` function for real-time information.
 
-**IMPORTANT: Check the current date shown above. When searching, prefer results from \
-the current year. Include the year in your query when looking for recent data.**
+**IMPORTANT: Check the current date shown above. When searching, include the current year \
+in your query to get recent results.**
 
-### Round-Based Search Strategy
+---
 
-**First Round (Opening):** This is your ONLY chance to build a knowledge foundation. \
-Search actively to gather current facts, recent developments, and key data about the \
-debate topic. A well-informed opening argument is worth the search cost.
+### Round 1: Knowledge Gathering Phase
 
-**Later Rounds:** Switch to strict conservation mode. Search is now a last resort — \
-rely on reasoning and the information you've already gathered.
+**This is your ONLY opportunity to research. Use it wisely.**
 
-### When to Search in Later Rounds (Narrow Cases)
+Your first-round response must follow this structure:
 
-From round 2 onward, only call `web_search` when ALL of these conditions are met:
+1. **Search actively** — Call `web_search` multiple times to gather:
+   - Latest facts and statistics about the topic
+   - Recent developments (from the current year)
+   - Key arguments from multiple perspectives
+   - Notable examples or case studies
 
-1. **A specific factual claim is central** to the current exchange
-2. **The claim is verifiable** (not a matter of opinion or prediction)
-3. **You genuinely cannot proceed** without this information
-4. **The claim is surprising or controversial** (not common knowledge)
+2. **Summarize what you learned** — After searching, briefly synthesize the key findings:
+   - "Based on my research, here's what I've learned..."
+   - List 2-4 important facts or data points
 
-### When NOT to Search
+3. **Declare readiness** — End with a clear statement:
+   - "我已准备好，可以开始辩论。" (I am ready to begin the debate.)
+   - Or equivalent in the debate's language
 
-- General argumentation and logical reasoning
-- Common knowledge (even if you're slightly fuzzy on details)
-- Historical events that are well-established
-- Making analogies or thought experiments
-- Responding to opinions, predictions, or value judgments
-- "I want to double-check" or "It would be nice to have data"
-- **When in doubt: argue, don't search.**
+**Do NOT make your opening argument yet.** This round is for preparation only.
 
-### Rate Limit (Later Rounds)
+---
 
-From round 2 onward, search **at most once per debate round**. If you've already \
-searched this round, rely on reasoning and existing knowledge.
+### Round 2+: Conservation Mode
 
-### How to Search
+**From round 2 onward, search is disabled.** Rely entirely on:
+- The knowledge you gathered in round 1
+- Your reasoning and argumentation skills
+- Responding to opponents' points
 
-1. Briefly state what you're looking for: "Let me check the latest data on..."
-2. CALL `web_search` with a targeted query — **include the current year** if recency matters
-3. Use the result directly in your argument
+You may ONLY search if ALL conditions are met:
+- A specific verifiable claim is central AND
+- You cannot proceed without it AND
+- The claim is surprising (not common knowledge)
+
+Maximum: **one search per round** after round 1.
+
+---
+
+### Search Best Practices
+
+1. State what you're looking for, then immediately CALL `web_search`
+2. Use specific queries: `"renewable energy growth 2026"` not just `"energy"`
+3. After receiving results, extract key facts and move on
 """
 
 STANCE_INSTRUCTIONS = {
