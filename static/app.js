@@ -593,7 +593,8 @@ class DebateApp {
                 const time = el.querySelector('.message-time')?.textContent || '';
                 const content = el.querySelector('.message-content')?.innerHTML || '';
                 const isUser = el.classList.contains('user');
-                const cls = isUser ? 'user-msg' : 'debater-msg';
+                const isToolCard = el.classList.contains('tool-card');
+                const cls = isUser ? 'user-msg' : (isToolCard ? 'tool-msg' : 'debater-msg');
                 body += `<div class="${cls}">
   <div class="msg-header"><span class="avatar">${avatar}</span> <span class="sender" style="color:${color}">${this.escapeHtml(sender)}</span> <span class="time">${time}</span></div>
   <div class="msg-body">${content}</div>
@@ -622,6 +623,7 @@ class DebateApp {
   .user-msg .msg-body{border-left-color:#2d3e50;background:${userBg}}
   .sys-msg{text-align:center;color:${muted};font-style:italic;font-size:.84rem;margin:12px 0}
   .sys-msg::before,.sys-msg::after{content:' — ';color:${border}}
+  .tool-msg .msg-body{border-left:1px dashed ${border};background:${bg};font-size:.85rem;color:${muted}}
 </style></head><body>
 <h1>${this.escapeHtml(topic)}</h1>
 ${body}
