@@ -488,9 +488,18 @@ class DebateApp {
     }
 
     renderContent(raw) {
-        const html = marked.parse(raw);
-        // Replace [[Name]] with highlighted mention badges
-        return html.replace(/\[\[([^\]]+)\]\]/g, '<span class="mention">$1</span>');
+        // Protect [[Name]] patterns from marked.js before parsing.
+        // marked treats [[ as link reference syntax and mangles them.
+        const mentions = [];
+        const sanitized = raw.replace(/\[\[([^\]]+)\]\]/g, (match, name) => {
+            mentions.push(name);
+            return `%%MENTION_${mentions.length - 1}%%`;
+        });
+        const html = marked.parse(sanitized);
+        // Restore mentions as highlighted badges
+        return html.replace(/%%MENTION_(\d+)%%/g, (_, i) => {
+            return `<span class="mention">${this.escapeHtml(mentions[parseInt(i)])}</span>`;
+        });
     }
 
     scrollToBottom() {
