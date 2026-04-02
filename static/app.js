@@ -455,11 +455,18 @@ class DebateApp {
 
         const label = document.createElement('div');
         label.className = 'tool-card-label';
-        label.textContent = '🔍 Searched: ' + query;
+        label.innerHTML = '<span class="tool-card-toggle">▶</span> 🔍 Searched: ' + this.escapeHtml(query);
+        label.title = 'Click to expand/collapse results';
+        label.style.cursor = 'pointer';
 
         const results = document.createElement('div');
-        results.className = 'tool-card-results';
+        results.className = 'tool-card-results tool-card-collapsed';
         results.innerHTML = this.renderContent(resultSummary || '');
+
+        label.addEventListener('click', () => {
+            const collapsed = results.classList.toggle('tool-card-collapsed');
+            label.querySelector('.tool-card-toggle').textContent = collapsed ? '▶' : '▼';
+        });
 
         content.appendChild(label);
         content.appendChild(results);

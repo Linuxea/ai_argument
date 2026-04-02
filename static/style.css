@@ -782,3 +782,20 @@ button:disabled {
     padding-left: 18px;
     margin: 4px 0;
 }
+
+/* Collapsed state for search results */
+.tool-card .tool-card-results.tool-card-collapsed {
+    display: none;
+}
+
+.tool-card .tool-card-toggle {
+    display: inline-block;
+    width: 16px;
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+    color: var(--text-muted);
+}
+
+.tool-card .tool-card-label:hover .tool-card-toggle {
+    color: var(--text-soft);
+}
