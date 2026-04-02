@@ -1,36 +1,41 @@
 # tests/test_debate_engine.py
 import pytest
+
 from debate_engine import DebateEngine, DebateState, Message
 from models import Debater
-from tests.conftest import MockLLMClient
+from tests.conftest import MockDebateAgent
 
 
-def test_build_messages_starts_with_system_and_topic():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+def _make_engine(responses=None):
+    """Create a DebateEngine with mocked agents."""
+    import asyncio
 
-    debater = Debater(
-        name="Test Debater",
-        personality="You are a test debater."
-    )
-    engine.state = DebateState(
-        topic="Should AI replace teachers?",
-        debaters=[debater]
-    )
-
-    messages = engine.build_messages(debater)
-
-    assert messages[0]["role"] == "system"
-    assert "You are a test debater." in messages[0]["content"]
-    assert "multi-party debate" in messages[0]["content"]
-    assert messages[1]["role"] == "user"
-    assert "Should AI replace teachers?" in messages[1]["content"]
+    mock = MockDebateAgent(responses=responses)
+    # Create engine without calling __init__ to avoid creating real agents
+    engine = object.__new__(DebateEngine)
+    engine.model = "test:model"
+    engine.debater_agent = mock
+    engine.judge_agent = MockDebateAgent(responses=responses or ["Judgment."])
+    engine.state = None
+    engine.event_queue = asyncio.Queue()
+    engine._loop_task = None
+    engine._history = {}
+    return engine, mock
 
 
-def test_build_messages_assigns_correct_roles():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+def test_build_user_prompt_first_turn():
+    engine, _ = _make_engine()
+    debater = Debater(name="Test Debater", personality="You are a test debater.")
+    engine.state = DebateState(topic="Should AI replace teachers?", debaters=[debater])
 
+    prompt = engine._build_user_prompt(debater)
+
+    assert "first speaker" in prompt
+    assert "Should AI replace teachers?" in prompt
+
+
+def test_build_user_prompt_subsequent_turn():
+    engine, _ = _make_engine()
     skeptic = Debater(name="Skeptic", personality="Be skeptical.")
     optimist = Debater(name="Optimist", personality="Be optimistic.")
 
@@ -41,54 +46,41 @@ def test_build_messages_assigns_correct_roles():
             Message(speaker="Skeptic", content="Teachers are irreplaceable."),
             Message(speaker="Optimist", content="AI can enhance learning."),
             Message(speaker="You", content="What about special needs?"),
-        ]
+        ],
     )
 
-    # Build messages for Skeptic
-    messages = engine.build_messages(skeptic)
+    prompt = engine._build_user_prompt(skeptic)
 
-    # Skeptic's own message should be "assistant"
-    assert messages[2]["role"] == "assistant"
-    assert messages[2]["content"] == "Teachers are irreplaceable."
-
-    # Optimist's message should be "user" with prefix
-    assert messages[3]["role"] == "user"
-    assert messages[3]["content"] == "[Optimist]: AI can enhance learning."
-
-    # User's message should be "user" with prefix
-    assert messages[4]["role"] == "user"
-    assert messages[4]["content"] == "[You]: What about special needs?"
+    # Skeptic's own messages should be excluded
+    assert "Teachers are irreplaceable." not in prompt
+    # Other speakers should appear
+    assert "[Optimist]: AI can enhance learning." in prompt
+    assert "[You]: What about special needs?" in prompt
+    assert "Debate topic: AI in education" in prompt
 
 
 def test_advance_turn_round_robin():
-    mock_llm = MockLLMClient(responses=["Response A", "Response B"])
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine(responses=["Response A", "Response B"])
 
     debater_a = Debater(name="A", personality="You are A.")
     debater_b = Debater(name="B", personality="You are B.")
 
-    engine.state = DebateState(
-        topic="Test topic",
-        debaters=[debater_a, debater_b]
-    )
+    engine.state = DebateState(topic="Test topic", debaters=[debater_a, debater_b])
 
     assert engine.state.current_turn_index == 0
     assert engine.state.current_round == 0
 
-    # After first turn, should advance to B (index 1)
     engine._advance_turn()
     assert engine.state.current_turn_index == 1
     assert engine.state.current_round == 0
 
-    # After second turn, should wrap to A (index 0) and increment round
     engine._advance_turn()
     assert engine.state.current_turn_index == 0
     assert engine.state.current_round == 1
 
 
 def test_inject_message_adds_to_history():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
 
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater])
@@ -101,8 +93,7 @@ def test_inject_message_adds_to_history():
 
 
 def test_stop_sets_inactive():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
 
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater], active=True)
@@ -113,8 +104,7 @@ def test_stop_sets_inactive():
 
 
 def test_resume_sets_active():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
 
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater], active=False)
@@ -124,18 +114,15 @@ def test_resume_sets_active():
     assert engine.state.active is True
 
 
-# Tests for input validation in start()
 def test_start_raises_error_on_empty_debaters():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
 
     with pytest.raises(ValueError, match="debaters list cannot be empty"):
         engine.start(topic="Test topic", debaters=[])
 
 
 def test_start_raises_error_on_zero_max_rounds():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
     debater = Debater(name="Test", personality="Test.")
 
     with pytest.raises(ValueError, match="max_rounds must be greater than 0"):
@@ -143,18 +130,15 @@ def test_start_raises_error_on_zero_max_rounds():
 
 
 def test_start_raises_error_on_negative_max_rounds():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
     debater = Debater(name="Test", personality="Test.")
 
     with pytest.raises(ValueError, match="max_rounds must be greater than 0"):
         engine.start(topic="Test topic", debaters=[debater], max_rounds=-1)
 
 
-# Tests for boolean return values
 def test_inject_message_returns_true_when_state_exists():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater])
 
@@ -164,8 +148,7 @@ def test_inject_message_returns_true_when_state_exists():
 
 
 def test_inject_message_returns_false_when_no_state():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
 
     result = engine.inject_message("Test message")
 
@@ -173,8 +156,7 @@ def test_inject_message_returns_false_when_no_state():
 
 
 def test_stop_returns_true_when_state_exists():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater], active=True)
 
@@ -184,8 +166,7 @@ def test_stop_returns_true_when_state_exists():
 
 
 def test_stop_returns_false_when_no_state():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
 
     result = engine.stop()
 
@@ -193,8 +174,7 @@ def test_stop_returns_false_when_no_state():
 
 
 def test_resume_returns_true_when_state_exists():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater], active=False)
 
@@ -204,26 +184,36 @@ def test_resume_returns_true_when_state_exists():
 
 
 def test_resume_returns_false_when_no_state():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
 
     result = engine.resume()
 
     assert result is False
 
 
-# Tests for async methods
+def test_start_initializes_per_debater_history():
+    engine, _ = _make_engine()
+    skeptic = Debater(name="Skeptic", personality="Be skeptical.")
+    optimist = Debater(name="Optimist", personality="Be optimistic.")
+
+    engine.start(topic="Test", debaters=[skeptic, optimist])
+
+    assert "Skeptic" in engine._history
+    assert "Optimist" in engine._history
+    assert engine._history["Skeptic"] == []
+    assert engine._history["Optimist"] == []
+
+
 @pytest.mark.asyncio
 async def test_run_turn_emits_correct_events():
-    mock_llm = MockLLMClient(responses=["Hello world from debater."])
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, mock = _make_engine(responses=["Hello world from debater."])
 
     debater = Debater(name="Alice", personality="You are Alice.")
     engine.state = DebateState(topic="Test topic", debaters=[debater])
+    engine._history = {"Alice": []}  # Initialize per-debater history
 
     await engine.run_turn()
 
-    # Check events were emitted
     events = []
     while not engine.event_queue.empty():
         events.append(await engine.event_queue.get())
@@ -233,11 +223,9 @@ async def test_run_turn_emits_correct_events():
     assert "debater_chunk" in event_types
     assert "debater_end" in event_types
 
-    # Verify debater_start payload
     start_event = next(e for e in events if e.type == "debater_start")
     assert start_event.payload["debater_name"] == "Alice"
 
-    # Verify debater_end payload
     end_event = next(e for e in events if e.type == "debater_end")
     assert end_event.payload["debater_name"] == "Alice"
     assert "Hello world from debater." in end_event.payload["full_text"]
@@ -245,11 +233,11 @@ async def test_run_turn_emits_correct_events():
 
 @pytest.mark.asyncio
 async def test_run_turn_adds_message_to_history():
-    mock_llm = MockLLMClient(responses=["This is my argument."])
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, mock = _make_engine(responses=["This is my argument."])
 
     debater = Debater(name="Bob", personality="You are Bob.")
     engine.state = DebateState(topic="Test topic", debaters=[debater])
+    engine._history = {"Bob": []}  # Initialize per-debater history
 
     await engine.run_turn()
 
@@ -260,51 +248,43 @@ async def test_run_turn_adds_message_to_history():
 
 @pytest.mark.asyncio
 async def test_run_turn_does_nothing_when_state_is_none():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
-    # Don't set state
+    engine, _ = _make_engine()
 
     await engine.run_turn()
 
-    # Should not raise error and queue should be empty
     assert engine.event_queue.empty()
 
 
 @pytest.mark.asyncio
 async def test_run_turn_does_nothing_when_not_active():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
+
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater], active=False)
 
     await engine.run_turn()
 
-    # Should not have called LLM or added events
     assert engine.event_queue.empty()
     assert len(engine.state.history) == 0
 
 
 @pytest.mark.asyncio
 async def test_run_loop_respects_max_rounds():
-    mock_llm = MockLLMClient(responses=["Argument 1", "Argument 2"])
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine(responses=["Argument 1", "Argument 2"])
 
     debater_a = Debater(name="A", personality="You are A.")
     debater_b = Debater(name="B", personality="You are B.")
 
     engine.state = DebateState(
-        topic="Test topic",
-        debaters=[debater_a, debater_b],
-        max_rounds=2
+        topic="Test topic", debaters=[debater_a, debater_b], max_rounds=2
     )
+    engine._history = {"A": [], "B": []}  # Initialize per-debater history
 
     await engine.run_loop()
 
-    # With max_rounds=2 and 2 debaters, we should have 4 turns total
     assert engine.state.current_round == 2
     assert engine.state.active is False
 
-    # Check that debate_end event was emitted
     events = []
     while not engine.event_queue.empty():
         events.append(await engine.event_queue.get())
@@ -316,49 +296,40 @@ async def test_run_loop_respects_max_rounds():
 
 @pytest.mark.asyncio
 async def test_run_loop_emits_round_end_event():
-    mock_llm = MockLLMClient(responses=["Arg"])
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine(responses=["Arg"])
 
     debater = Debater(name="Solo", personality="Solo debater.")
-    engine.state = DebateState(
-        topic="Test topic",
-        debaters=[debater],
-        max_rounds=2
-    )
+    engine.state = DebateState(topic="Test topic", debaters=[debater], max_rounds=2)
+    engine._history = {"Solo": []}  # Initialize per-debater history
 
     await engine.run_loop()
 
-    # Collect events
     events = []
     while not engine.event_queue.empty():
         events.append(await engine.event_queue.get())
 
     round_end_events = [e for e in events if e.type == "round_end"]
-    # Should have 2 round_end events (round 1 and round 2)
     assert len(round_end_events) == 2
 
 
 @pytest.mark.asyncio
 async def test_run_loop_stops_when_debate_stopped():
-    mock_llm = MockLLMClient(responses=["Response"])
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine(responses=["Response"])
 
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater], active=True)
 
-    # Stop the debate before running loop
     engine.stop()
 
     await engine.run_loop()
 
-    # Should not have processed any turns
     assert len(engine.state.history) == 0
 
 
 @pytest.mark.asyncio
 async def test_judge_returns_true_when_state_exists():
-    mock_llm = MockLLMClient(responses=["My judgment is..."])
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine(responses=["My judgment is..."])
+
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test topic", debaters=[debater])
 
@@ -369,8 +340,7 @@ async def test_judge_returns_true_when_state_exists():
 
 @pytest.mark.asyncio
 async def test_judge_returns_false_when_no_state():
-    mock_llm = MockLLMClient()
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine()
 
     result = await engine.judge()
 
@@ -379,8 +349,8 @@ async def test_judge_returns_false_when_no_state():
 
 @pytest.mark.asyncio
 async def test_judge_emits_correct_events():
-    mock_llm = MockLLMClient(responses=["The winner is..."])
-    engine = DebateEngine(llm_client=mock_llm)
+    engine, _ = _make_engine(responses=["The winner is..."])
+
     debater = Debater(name="Test", personality="Test.")
     engine.state = DebateState(topic="Test topic", debaters=[debater])
 
@@ -396,3 +366,27 @@ async def test_judge_emits_correct_events():
 
     judge_result = next(e for e in events if e.type == "judge_result")
     assert "The winner is..." in judge_result.payload["judgment_text"]
+
+
+def test_update_model_recreates_agents():
+    engine, _ = _make_engine()
+
+    old_debater = engine.debater_agent
+    old_judge = engine.judge_agent
+
+    # Mock the create_*_agent functions to avoid calling real PydanticAI
+    from unittest.mock import patch
+
+    with patch("debate_engine.create_debater_agent") as mock_debater_creator, patch(
+        "debate_engine.create_judge_agent"
+    ) as mock_judge_creator:
+        mock_debater_creator.return_value = MockDebateAgent()
+        mock_judge_creator.return_value = MockDebateAgent()
+
+        engine.update_model("new:model")
+
+        assert engine.model == "new:model"
+        assert engine.debater_agent is not old_debater
+        assert engine.judge_agent is not old_judge
+        mock_debater_creator.assert_called_once_with("new:model")
+        mock_judge_creator.assert_called_once_with("new:model")

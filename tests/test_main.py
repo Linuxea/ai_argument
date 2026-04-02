@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 def test_get_presets_returns_debaters():
     from main import app
+
     client = TestClient(app)
 
     response = client.get("/api/presets")
@@ -11,11 +12,15 @@ def test_get_presets_returns_debaters():
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 3
-    assert data[0]["name"] == "The Skeptic"
+    # Preset names are in Chinese (see presets.yaml)
+    assert data[0]["name"] == "质疑者"
+    assert data[1]["name"] == "乐观派"
+    assert data[2]["name"] == "分析家"
 
 
 def test_get_root_serves_html():
     from main import app
+
     client = TestClient(app)
 
     response = client.get("/")
@@ -26,11 +31,11 @@ def test_get_root_serves_html():
 
 def test_start_debate_validates_min_debaters():
     from main import app
+
     client = TestClient(app)
 
-    response = client.post("/api/debate/start", json={
-        "topic": "Test topic",
-        "debater_names": ["The Skeptic"]  # Only one debater
-    })
+    response = client.post(
+        "/api/debate/start", json={"topic": "Test topic", "debater_names": ["质疑者"]}
+    )
 
     assert response.status_code == 400

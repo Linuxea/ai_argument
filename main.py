@@ -7,8 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 
 from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, ApiSettings
-from config import load_presets, settings
-from llm_client import LLMClient
+from config import load_presets, settings, build_model_string
 from debate_engine import DebateEngine
 
 
@@ -20,12 +19,8 @@ custom_debaters: list[Debater] = []
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global debate_engine
-    llm = LLMClient(
-        base_url=settings.api_base_url,
-        api_key=settings.api_key,
-        model=settings.model
-    )
-    debate_engine = DebateEngine(llm_client=llm)
+    model = build_model_string(settings.api_base_url, settings.model)
+    debate_engine = DebateEngine(model=model)
     yield
 
 
@@ -164,7 +159,7 @@ async def list_models():
 
 @app.post("/api/settings")
 async def update_settings(api_settings: ApiSettings):
-    """Update API settings and recreate the LLM client. Empty values fall back to defaults."""
+    """Update API settings and update the model. Empty values fall back to defaults."""
     global debate_engine
 
     if api_settings.api_url:
@@ -174,11 +169,8 @@ async def update_settings(api_settings: ApiSettings):
     if api_settings.model_name:
         settings.model = api_settings.model_name
 
-    debate_engine.llm = LLMClient(
-        base_url=settings.api_base_url,
-        api_key=settings.api_key,
-        model=settings.model
-    )
+    model = build_model_string(settings.api_base_url, settings.model)
+    debate_engine.update_model(model)
 
     return {"status": "updated"}
 
