@@ -62,6 +62,16 @@ class DebateApp {
         this.settingsClose = document.getElementById('settings-close');
         this.settingsPanel = document.getElementById('settings-panel');
         this.settingsBackdrop = document.getElementById('settings-backdrop');
+
+        // Search tool
+        this.searchToggleBtn = document.getElementById('search-toggle-btn');
+        this.searchDrawer = document.getElementById('search-drawer');
+        this.searchBackdrop = document.getElementById('search-backdrop');
+        this.searchClose = document.getElementById('search-close');
+        this.searchInput = document.getElementById('search-input');
+        this.searchResults = document.getElementById('search-results');
+        this._searchDebounceTimer = null;
+        this._messageIndex = [];
     }
 
     bindEventListeners() {
@@ -96,9 +106,21 @@ class DebateApp {
         this.settingsBtn.addEventListener('click', () => this.openSettings());
         this.settingsClose.addEventListener('click', () => this.closeSettings());
         this.settingsBackdrop.addEventListener('click', () => this.closeSettings());
+
+        // Search tool
+        this.searchToggleBtn.addEventListener('click', () => this.openSearchDrawer());
+        this.searchClose.addEventListener('click', () => this.closeSearchDrawer());
+        this.searchBackdrop.addEventListener('click', () => this.closeSearchDrawer());
+        this.searchInput.addEventListener('input', () => this.handleSearch());
+
+        // Global ESC handler for both settings and search
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.settingsPanel.classList.contains('open')) {
-                this.closeSettings();
+            if (e.key === 'Escape') {
+                if (this.searchDrawer.classList.contains('open')) {
+                    this.closeSearchDrawer();
+                } else if (this.settingsPanel.classList.contains('open')) {
+                    this.closeSettings();
+                }
             }
         });
     }
@@ -904,6 +926,149 @@ ${body}
         } catch (err) {
             console.error('Failed to fetch models:', err);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // Search Tool Methods
+    // ═══════════════════════════════════════════════════════
+
+    openSearchDrawer() {
+        this._indexMessages();
+        this.searchDrawer.classList.add('open');
+        this.searchBackdrop.classList.add('open');
+        setTimeout(() => this.searchInput.focus(), 100);
+    }
+
+    closeSearchDrawer() {
+        this.searchDrawer.classList.remove('open');
+        this.searchBackdrop.classList.remove('open');
+        this.searchInput.value = '';
+        this.searchResults.innerHTML = '';
+        this.searchToggleBtn.focus();
+    }
+
+    _indexMessages() {
+        // Build searchable index from all rendered messages
+        this._messageIndex = [];
+        const msgEls = this.messages.querySelectorAll('.message');
+        msgEls.forEach((el, idx) => {
+            const contentEl = el.querySelector('.message-content');
+            if (!contentEl) return;
+
+            const text = contentEl.innerText || '';
+            const sender = el.querySelector('.message-sender')?.textContent || '';
+            const avatar = el.querySelector('.message-avatar')?.textContent || '';
+            const time = el.querySelector('.message-time')?.textContent || '';
+            const color = el.querySelector('.message-sender')?.style.color || '#333333';
+
+            this._messageIndex.push({
+                id: idx,
+                element: el,
+                text,
+                sender,
+                avatar,
+                time,
+                color
+            });
+        });
+    }
+
+    handleSearch() {
+        const query = this.searchInput.value.trim().toLowerCase();
+
+        if (!query) {
+            this.searchResults.innerHTML = '';
+            return;
+        }
+
+        // Search through indexed messages
+        const matches = this._messageIndex
+            .filter(msg => msg.text.toLowerCase().includes(query))
+            .slice(0, 10); // Limit to 10 results
+
+        this._renderSearchResults(matches, query);
+    }
+
+    _renderSearchResults(matches, query) {
+        this.searchResults.innerHTML = '';
+
+        if (matches.length === 0) {
+            this.searchResults.innerHTML = '<div class="search-empty">没有找到匹配的消息</div>';
+            return;
+        }
+
+        matches.forEach(msg => {
+            const item = document.createElement('div');
+            item.className = 'search-result-item';
+
+            // Create header
+            const header = document.createElement('div');
+            header.className = 'search-result-header';
+
+            const avatarEl = document.createElement('span');
+            avatarEl.className = 'search-result-avatar';
+            avatarEl.textContent = msg.avatar;
+
+            const senderEl = document.createElement('span');
+            senderEl.className = 'search-result-sender';
+            senderEl.style.color = this.sanitizeColor(msg.color);
+            senderEl.textContent = msg.sender;
+
+            const timeEl = document.createElement('span');
+            timeEl.className = 'search-result-time';
+            timeEl.textContent = msg.time;
+
+            header.appendChild(avatarEl);
+            header.appendChild(senderEl);
+            header.appendChild(timeEl);
+
+            // Create preview with highlight
+            const preview = document.createElement('div');
+            preview.className = 'search-result-preview';
+            preview.innerHTML = this._highlightText(msg.text, query);
+
+            item.appendChild(header);
+            item.appendChild(preview);
+
+            // Click to scroll and highlight
+            item.addEventListener('click', () => {
+                this.closeSearchDrawer();
+                this.scrollToMessage(msg.element);
+            });
+
+            this.searchResults.appendChild(item);
+        });
+    }
+
+    _highlightText(text, query) {
+        // Escape HTML first
+        const escaped = this.escapeHtml(text);
+
+        // Create case-insensitive regex for highlighting
+        const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi');
+        return escaped.replace(regex, '<span class="search-highlight">$1</span>');
+    }
+
+    escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    scrollToMessage(element) {
+        // Remove previous highlight
+        this.messages.querySelectorAll('.message.highlight').forEach(el => {
+            el.classList.remove('highlight');
+        });
+
+        // Scroll into view
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Add highlight animation
+        element.classList.add('highlight');
+
+        // Remove highlight after animation completes
+        setTimeout(() => {
+            element.classList.remove('highlight');
+        }, 2000);
     }
 }
 
