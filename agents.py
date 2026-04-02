@@ -74,11 +74,11 @@ Maximum: **one search per round** after round 1.
 
 **Search with your stance in mind.** Frame queries to find evidence that supports YOUR position:
 
-- **Supporting the topic**: Use positive/affirming keywords
+- **Supporting the topic (正方)**: Use positive/affirming keywords
   - `"benefits of X"`, `"X success stories"`, `"why X works"`, `"evidence for X"`
-- **Opposing the topic**: Use critical/skeptical keywords
+- **Opposing the topic (反方)**: Use critical/skeptical keywords
   - `"problems with X"`, `"X failure cases"`, `"criticism of X"`, `"risks of X"`
-- **Neutral stance**: Seek balanced coverage
+- **Neutral stance (中立)**: Seek balanced coverage
   - `"X pros and cons"`, `"X debate analysis"`, `"X controversy explained"`
 
 Don't search generic terms. A well-framed query finds ammunition for YOUR argument.
@@ -93,9 +93,9 @@ Don't search generic terms. A well-framed query finds ammunition for YOUR argume
 """
 
 STANCE_INSTRUCTIONS = {
-    "for": "You support the topic. Argue in favor of it. Focus on rebutting arguments from the opposing side - find their flaws, press hard, and do not let weak points slide.",
-    "against": "You oppose the topic. Argue against it. Focus on rebutting arguments from the supporting side - find their flaws, press hard, and do not let weak points slide.",
-    "neutral": "You take a balanced view. Weigh evidence from both sides.",
+    "正方": "You support the topic. Argue in favor of it. Focus on rebutting arguments from the opposing side - find their flaws, press hard, and do not let weak points slide.",
+    "反方": "You oppose the topic. Argue against it. Focus on rebutting arguments from the supporting side - find their flaws, press hard, and do not let weak points slide.",
+    "中立": "You take a balanced view. Weigh evidence from both sides.",
 }
 
 JUDGE_PROMPT = """\
@@ -163,7 +163,7 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
     from datetime import datetime
 
     debater = ctx.deps.debater
-    stance = STANCE_INSTRUCTIONS.get(debater.stance, STANCE_INSTRUCTIONS["neutral"])
+    stance = STANCE_INSTRUCTIONS.get(debater.stance, STANCE_INSTRUCTIONS["中立"])
 
     # Build date context with strong emphasis on current year
     now = datetime.now()

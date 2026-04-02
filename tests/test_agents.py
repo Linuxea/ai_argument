@@ -43,7 +43,7 @@ def test_build_debater_instructions_contains_rules():
 def test_build_debater_instructions_with_for_stance():
     debater = Debater(
         name="Optimist",
-        stance="for",
+        stance="正方",
         personality="Be optimistic.",
     )
     ctx = MagicMock()
@@ -63,7 +63,7 @@ def test_build_debater_instructions_with_for_stance():
 def test_build_debater_instructions_final_round():
     debater = Debater(
         name="Skeptic",
-        stance="against",
+        stance="反方",
         personality="Be skeptical.",
     )
     ctx = MagicMock()

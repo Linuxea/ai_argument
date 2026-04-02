@@ -15,7 +15,8 @@ class DebateApp {
         this.initTheme();
         this.bindElements();
         this.bindEventListeners();
-        this.loadSettings();
+        const maxRounds = localStorage.getItem('max_rounds');
+        if (maxRounds) this.maxRoundsInput.value = maxRounds;
         await this.loadDebaters();
     }
 
@@ -27,12 +28,6 @@ class DebateApp {
 
         // Debater list
         this.debaterList = document.getElementById('debater-list');
-
-        // API settings
-        this.apiUrl = document.getElementById('api-url');
-        this.apiKey = document.getElementById('api-key');
-        this.modelName = document.getElementById('model-name');
-        this._apiDebounceTimer = null;  // For debouncing API input changes
 
         // Control buttons
         this.startBtn = document.getElementById('start-btn');
@@ -58,12 +53,6 @@ class DebateApp {
         // Theme
         this.themeToggle = document.getElementById('theme-toggle');
 
-        // Settings panel
-        this.settingsBtn = document.getElementById('settings-btn');
-        this.settingsClose = document.getElementById('settings-close');
-        this.settingsPanel = document.getElementById('settings-panel');
-        this.settingsBackdrop = document.getElementById('settings-backdrop');
-
         // Search tool
         this.searchToggleBtn = document.getElementById('search-toggle-btn');
         this.searchDrawer = document.getElementById('search-drawer');
@@ -84,10 +73,6 @@ class DebateApp {
         // Topic refinement
         this.refineTopicBtn.addEventListener('click', () => this.refineTopic());
 
-        // API settings - auto-save and auto-fetch models with debounce
-        this.apiUrl.addEventListener('input', () => this.onApiInputChanged());
-        this.apiKey.addEventListener('input', () => this.onApiInputChanged());
-
         // Custom debater
         this.addDebaterBtn.addEventListener('click', () => this.addCustomDebater());
 
@@ -106,24 +91,17 @@ class DebateApp {
         // Theme
         this.themeToggle.addEventListener('click', () => this.toggleTheme());
 
-        // Settings panel
-        this.settingsBtn.addEventListener('click', () => this.openSettings());
-        this.settingsClose.addEventListener('click', () => this.closeSettings());
-        this.settingsBackdrop.addEventListener('click', () => this.closeSettings());
-
         // Search tool
         this.searchToggleBtn.addEventListener('click', () => this.openSearchDrawer());
         this.searchClose.addEventListener('click', () => this.closeSearchDrawer());
         this.searchBackdrop.addEventListener('click', () => this.closeSearchDrawer());
         this.searchInput.addEventListener('input', () => this.handleSearch());
 
-        // Global ESC handler for both settings and search
+        // Global ESC handler for search
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 if (this.searchDrawer.classList.contains('open')) {
                     this.closeSearchDrawer();
-                } else if (this.settingsPanel.classList.contains('open')) {
-                    this.closeSettings();
                 }
             }
         });
@@ -228,17 +206,6 @@ class DebateApp {
         this.refineTopicBtn.textContent = '优化中...';
 
         try {
-            // Ensure API settings are synced
-            await fetch('/api/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    api_url: this.apiUrl.value,
-                    api_key: this.apiKey.value,
-                    model_name: this.modelName.value
-                })
-            });
-
             const response = await fetch('/api/topic/refine', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -276,17 +243,6 @@ class DebateApp {
         }
 
         try {
-            // Sync current settings to backend before starting
-            await fetch('/api/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    api_url: this.apiUrl.value,
-                    api_key: this.apiKey.value,
-                    model_name: this.modelName.value
-                })
-            });
-
             // Clear messages
             this.messages.innerHTML = '';
             this._lastSpeakerName = null;  // Reset for new debate
@@ -858,132 +814,6 @@ ${body}
 
     _updateThemeIcon(isDark) {
         if (this.themeToggle) this.themeToggle.textContent = isDark ? '☀️' : '🌙';
-    }
-
-    openSettings() {
-        this.settingsPanel.classList.add('open');
-        this.settingsBackdrop.classList.add('open');
-        this.settingsBackdrop.setAttribute('aria-hidden', 'false');
-        setTimeout(() => this.apiUrl.focus(), 50);
-    }
-
-    closeSettings() {
-        this.settingsPanel.classList.remove('open');
-        this.settingsBackdrop.classList.remove('open');
-        this.settingsBackdrop.setAttribute('aria-hidden', 'true');
-        this.settingsBtn.focus();
-    }
-
-    async loadSettings() {
-        // Clear stale defaults from previous versions
-        const staleDefaults = ['http://localhost:11434/v1', 'ollama', 'llama3'];
-        ['api_url', 'api_key', 'model_name'].forEach((key, i) => {
-            if (localStorage.getItem(key) === staleDefaults[i]) {
-                localStorage.removeItem(key);
-            }
-        });
-
-        const apiUrl = localStorage.getItem('api_url');
-        const apiKey = localStorage.getItem('api_key');
-        const modelName = localStorage.getItem('model_name');
-        const maxRounds = localStorage.getItem('max_rounds');
-
-        if (apiUrl) this.apiUrl.value = apiUrl;
-        if (apiKey) this.apiKey.value = apiKey;
-        if (modelName) this.modelName.value = modelName;
-        if (maxRounds) this.maxRoundsInput.value = maxRounds;
-
-        // Sync cached settings to backend on reload
-        if (apiUrl || apiKey || modelName) {
-            fetch('/api/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    api_url: apiUrl,
-                    api_key: apiKey,
-                    model_name: modelName
-                })
-            }).then(() => this.fetchModels())
-              .catch(err => console.error('Failed to sync settings:', err));
-        }
-    }
-
-    onApiInputChanged() {
-        // Debounce: wait 500ms after user stops typing
-        clearTimeout(this._apiDebounceTimer);
-        this._apiDebounceTimer = setTimeout(() => this.syncApiSettings(), 500);
-    }
-
-    async syncApiSettings() {
-        const apiUrl = this.apiUrl.value.trim();
-        const apiKey = this.apiKey.value.trim();
-
-        // Clear model list if either field is empty
-        if (!apiUrl || !apiKey) {
-            this.modelName.innerHTML = '<option value="">-- 输入 API 后自动获取 --</option>';
-            localStorage.setItem('api_url', apiUrl);
-            localStorage.setItem('api_key', apiKey);
-            return;
-        }
-
-        try {
-            // Save to backend
-            const response = await fetch('/api/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    api_url: apiUrl,
-                    api_key: apiKey,
-                    model_name: this.modelName.value
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                console.error('Failed to save settings:', error.detail);
-                return;
-            }
-
-            // Cache to localStorage
-            localStorage.setItem('api_url', apiUrl);
-            localStorage.setItem('api_key', apiKey);
-            localStorage.setItem('model_name', this.modelName.value);
-            localStorage.setItem('max_rounds', this.maxRoundsInput.value);
-
-            // Fetch available models
-            await this.fetchModels();
-        } catch (error) {
-            console.error('Failed to sync settings:', error);
-        }
-    }
-
-    async fetchModels() {
-        try {
-            const resp = await fetch('/api/models');
-            if (!resp.ok) {
-                const err = await resp.json();
-                console.error('Failed to fetch models:', err.detail);
-                // Show error in the dropdown
-                this.modelName.innerHTML = `<option value="">-- ${err.detail} --</option>`;
-                return;
-            }
-            const data = await resp.json();
-            const current = this.modelName.value;
-            this.modelName.innerHTML = '';
-            data.models.forEach(id => {
-                const opt = document.createElement('option');
-                opt.value = id;
-                opt.textContent = id;
-                if (id === current) opt.selected = true;
-                this.modelName.appendChild(opt);
-            });
-            if (!current && data.models.length > 0) {
-                this.modelName.value = data.models[0];
-            }
-        } catch (err) {
-            console.error('Failed to fetch models:', err);
-            this.modelName.innerHTML = '<option value="">-- 网络错误 --</option>';
-        }
     }
 
     // ═══════════════════════════════════════════════════════

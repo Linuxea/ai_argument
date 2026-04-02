@@ -707,71 +707,6 @@ input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: none; }
    SETTINGS PANEL
    ═══════════════════════════════════════════════════════ */
 
-.settings-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.40);
-    z-index: 90;
-    backdrop-filter: blur(2px);
-}
-
-.settings-backdrop.open { display: block; }
-
-.settings-panel {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 350px;
-    height: 100vh;
-    background: var(--bg-surface);
-    border-left: 1px solid var(--border);
-    box-shadow: -6px 0 28px rgba(0, 0, 0, 0.15);
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    gap: 26px;
-    padding: 32px 24px;
-    overflow-y: auto;
-    transform: translateX(100%);
-    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.settings-panel.open {
-    transform: translateX(0);
-}
-
-.settings-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 20px;
-    border-bottom: 2px solid var(--gold);
-}
-
-.settings-panel-header h3 {
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: 0.05em;
-}
-
-/* Save settings button */
-#save-settings-btn {
-    background: var(--bg-elevated);
-    border-color: var(--border);
-    color: var(--ink-soft);
-    font-size: 0.85rem;
-    font-weight: 500;
-}
-
-#save-settings-btn:hover:not(:disabled) {
-    color: var(--gold);
-    border-color: var(--gold-dim);
-    transform: translateY(-1px);
-}
-
 /* ═══════════════════════════════════════════════════════
    TOOL CALL CARDS
    ═══════════════════════════════════════════════════════ */
@@ -1127,10 +1062,6 @@ input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: none; }
 
     .input-bar button {
         min-width: 75px;
-    }
-
-    .settings-panel {
-        width: 100%;
     }
 
     .search-drawer {

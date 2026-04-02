@@ -6,8 +6,8 @@ from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 
-from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, ApiSettings, RefineTopicRequest
-from config import load_presets, settings, build_model_string
+from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, RefineTopicRequest
+from config import load_presets, settings
 from debate_engine import DebateEngine
 
 
@@ -147,53 +147,6 @@ async def judge_debate():
 
     asyncio.create_task(debate_engine.judge())
     return {"status": "judging"}
-
-
-@app.get("/api/models")
-async def list_models():
-    """Fetch available models from the configured API provider."""
-    if not settings.api_key:
-        raise HTTPException(status_code=400, detail="请先输入 API Key")
-
-    try:
-        client = AsyncOpenAI(base_url=settings.api_base_url, api_key=settings.api_key)
-        models = await client.models.list()
-        model_ids = sorted([m.id for m in models.data])
-        return {"models": model_ids}
-    except Exception as e:
-        error_msg = str(e)
-        # Provide user-friendly error messages
-        if "401" in error_msg or "authentication" in error_msg.lower():
-            raise HTTPException(status_code=401, detail="API Key 无效，请检查")
-        elif "404" in error_msg:
-            raise HTTPException(status_code=404, detail=f"API URL 不正确或该提供商不支持模型列表接口。当前 URL: {settings.api_base_url}")
-        else:
-            raise HTTPException(status_code=502, detail=f"获取模型列表失败: {error_msg}")
-
-
-@app.post("/api/settings")
-async def update_settings(api_settings: ApiSettings):
-    """Update API settings and update the model. Empty values fall back to defaults."""
-    global debate_engine
-
-    if api_settings.api_url:
-        # Normalize URL: ensure it ends with /v1 for OpenAI-compatible APIs
-        url = api_settings.api_url.rstrip('/')
-        if not url.endswith('/v1'):
-            url = f"{url}/v1"
-        settings.api_base_url = url
-    if api_settings.api_key:
-        settings.api_key = api_settings.api_key
-    if api_settings.model_name:
-        settings.model = api_settings.model_name
-
-    debate_engine.update_model(
-        model_name=settings.model,
-        base_url=settings.api_base_url,
-        api_key=settings.api_key,
-    )
-
-    return {"status": "updated"}
 
 
 @app.post("/api/debaters")

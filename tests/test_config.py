@@ -6,8 +6,8 @@ def test_load_presets_returns_list_of_debaters():
     presets = load_presets()
     assert len(presets) == 3
     # Preset names are in Chinese (see presets.yaml)
-    assert presets[0].name == "质疑者"
-    assert presets[1].name == "乐观派"
+    assert presets[0].name == "正方"
+    assert presets[1].name == "反方"
     assert presets[2].name == "分析家"
 
 

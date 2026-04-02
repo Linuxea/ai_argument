@@ -13,8 +13,8 @@ def test_get_presets_returns_debaters():
     data = response.json()
     assert len(data) == 3
     # Preset names are in Chinese (see presets.yaml)
-    assert data[0]["name"] == "质疑者"
-    assert data[1]["name"] == "乐观派"
+    assert data[0]["name"] == "正方"
+    assert data[1]["name"] == "反方"
     assert data[2]["name"] == "分析家"
 
 
@@ -35,7 +35,7 @@ def test_start_debate_validates_min_debaters():
     client = TestClient(app)
 
     response = client.post(
-        "/api/debate/start", json={"topic": "Test topic", "debater_names": ["质疑者"]}
+        "/api/debate/start", json={"topic": "Test topic", "debater_names": ["正方"]}
     )
 
     assert response.status_code == 400

@@ -6,7 +6,7 @@ class Debater(BaseModel):
     name: str
     color: str = "#333333"
     avatar: str = "💬"
-    stance: Literal["for", "against", "neutral"] = "neutral"
+    stance: Literal["正方", "反方", "中立"] = "中立"
     personality: str
     enable_search: bool = True
 
@@ -29,17 +29,11 @@ class UserMessage(BaseModel):
     message: str
 
 
-class ApiSettings(BaseModel):
-    api_url: str
-    api_key: str
-    model_name: str
-
-
 class CustomDebaterRequest(BaseModel):
     name: str
     color: str = "#333333"
     avatar: str = "💬"
-    stance: Literal["for", "against", "neutral"] = "neutral"
+    stance: Literal["正方", "反方", "中立"] = "中立"
     personality: str
     enable_search: bool = True
 
