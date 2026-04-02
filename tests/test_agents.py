@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from pydantic_ai.models import Model
 from agents import (
     create_debater_agent,
     create_judge_agent,
@@ -13,13 +14,20 @@ from agents import (
 from models import Debater
 
 
+def _mock_model():
+    """Create a mock that passes isinstance(model, Model) check."""
+    return MagicMock(spec=Model)
+
+
 def test_create_debater_agent_returns_agent():
-    agent = create_debater_agent("deepseek:deepseek-chat")
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key")
     assert agent is not None
 
 
 def test_create_judge_agent_returns_agent():
-    agent = create_judge_agent("deepseek:deepseek-chat")
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
     assert agent is not None
 
 
@@ -118,12 +126,14 @@ def test_debater_deps_brave_api_key_defaults_none():
 
 
 def test_debater_agent_has_web_search_tool():
-    agent = create_debater_agent("deepseek:deepseek-chat")
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key")
     tool_names = list(agent._function_toolset.tools.keys())
     assert "web_search" in tool_names
 
 
 def test_judge_agent_has_no_web_search_tool():
-    agent = create_judge_agent("deepseek:deepseek-chat")
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
     tool_names = list(agent._function_toolset.tools.keys())
     assert "web_search" not in tool_names

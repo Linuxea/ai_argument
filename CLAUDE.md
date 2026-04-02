@@ -18,14 +18,6 @@ python -m pytest tests/test_debate_engine.py -v
 python -m pytest tests/test_debate_engine.py::test_build_messages_assigns_correct_roles -v
 ```
 
-### Known Test Failures
-
-Two tests fail because `presets.yaml` uses Chinese names but assertions expect English:
-- `tests/test_config.py::test_load_presets_returns_list_of_debaters` — expects "The Skeptic", actual "质疑者"
-- `tests/test_main.py::test_get_presets_returns_debaters` — same issue
-
-Fix: update test assertions to match the Chinese preset names, or restore English presets.
-
 ## Architecture
 
 ### Core Algorithm: Message Role Mapping

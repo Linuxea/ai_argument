@@ -1,6 +1,7 @@
 import asyncio
 import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,21 +11,25 @@ from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, Ref
 from config import load_presets, settings
 from debate_engine import DebateEngine
 
+BASE_DIR = Path(__file__).parent
 
 # Global state
 debate_engine: DebateEngine = None
 custom_debaters: list[Debater] = []
+_cached_index_html: str | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global debate_engine
+    global debate_engine, _cached_index_html
     debate_engine = DebateEngine(
         model=settings.model,
         base_url=settings.api_base_url,
         api_key=settings.api_key,
         brave_api_key=settings.brave_api_key,
     )
+    # Cache index.html at startup so we don't do sync I/O on every request
+    _cached_index_html = (BASE_DIR / "static" / "index.html").read_text()
     yield
 
 
@@ -32,14 +37,13 @@ app = FastAPI(title="AI Debate Chatroom", lifespan=lifespan)
 
 
 # Serve static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Serve the main HTML page."""
-    with open("static/index.html") as f:
-        return f.read()
+    return _cached_index_html or (BASE_DIR / "static" / "index.html").read_text()
 
 
 @app.get("/api/presets")
@@ -94,7 +98,7 @@ async def debate_stream():
                     data = json.dumps(event.payload)
                     yield f"event: {event.type}\ndata: {data}\n\n"
 
-                    if event.type in ("debate_end", "judge_result"):
+                    if event.type in ("debate_end", "judge_result", "debate_paused"):
                         break
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
@@ -163,7 +167,8 @@ async def create_debater(request: CustomDebaterRequest):
         color=request.color,
         avatar=request.avatar,
         stance=request.stance,
-        personality=request.personality
+        personality=request.personality,
+        enable_search=request.enable_search,
     )
     custom_debaters.append(debater)
     return {"status": "created", "debater": debater.model_dump()}

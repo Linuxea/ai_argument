@@ -1,3 +1,25 @@
+// Configure marked.js for safe rendering — disable raw HTML in markdown
+marked.setOptions({
+    breaks: true,
+    gfm: true,
+    headerIds: false,
+    mangle: false,
+});
+
+// Escape all raw HTML that appears in markdown input.
+// In marked.js the renderer method for raw HTML tokens is called "html"
+// (it handles both block-level and inline HTML). By overriding it to
+// escape the text we neutralise any XSS payload the LLM might emit.
+marked.use({
+    renderer: {
+        html({ text }) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        },
+    },
+});
+
 class DebateApp {
     constructor() {
         this.eventSource = null;
@@ -49,6 +71,9 @@ class DebateApp {
         this.sendBtn = document.getElementById('send-btn');
         this.judgeBtn = document.getElementById('judge-btn');
         this.downloadBtn = document.getElementById('download-btn');
+
+        // Unhide judge button (starts hidden in HTML)
+        if (this.judgeBtn) this.judgeBtn.removeAttribute('hidden');
 
         // Theme
         this.themeToggle = document.getElementById('theme-toggle');
@@ -213,7 +238,7 @@ class DebateApp {
             });
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.detail || '话题优化失败');
             }
 
@@ -260,7 +285,7 @@ class DebateApp {
             });
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.detail || '启动辩论失败');
             }
 
@@ -286,11 +311,21 @@ class DebateApp {
         });
     }
 
+    _parseSSEData(e, eventName) {
+        try {
+            return JSON.parse(e.data);
+        } catch (err) {
+            console.error(`Failed to parse SSE data for ${eventName}:`, err, e.data);
+            return null;
+        }
+    }
+
     connectSSE() {
         this.eventSource = new EventSource('/api/debate/stream');
 
         this.eventSource.addEventListener('debater_start', (e) => {
-            const data = JSON.parse(e.data);
+            const data = this._parseSSEData(e, 'debater_start');
+            if (!data) return;
             this._currentDebaterName = data.debater_name;
             this._currentDebaterColor = data.color;
             this._currentDebaterAvatar = data.avatar;
@@ -298,17 +333,23 @@ class DebateApp {
         });
 
         this.eventSource.addEventListener('debater_chunk', (e) => {
-            const data = JSON.parse(e.data);
+            const data = this._parseSSEData(e, 'debater_chunk');
+            if (!data) return;
             this.appendToMessage(data.text_chunk);
         });
 
+        this.eventSource.addEventListener('debater_finalize', () => {
+            this.finalizeMessage();
+        });
+
         this.eventSource.addEventListener('debater_end', (e) => {
-            const data = JSON.parse(e.data);
+            this._parseSSEData(e, 'debater_end');
             this.finalizeMessage();
         });
 
         this.eventSource.addEventListener('tool_call', (e) => {
-            const data = JSON.parse(e.data);
+            const data = this._parseSSEData(e, 'tool_call');
+            if (!data) return;
             // Finalize current text bubble (if any)
             this.finalizeMessage();
             // Render search card
@@ -316,18 +357,33 @@ class DebateApp {
         });
 
         this.eventSource.addEventListener('round_end', (e) => {
-            const data = JSON.parse(e.data);
+            const data = this._parseSSEData(e, 'round_end');
+            if (!data) return;
             this.addSystemMessage(`第 ${data.round_number} 轮结束`);
         });
 
+        this.eventSource.addEventListener('debate_paused', (e) => {
+            this._parseSSEData(e, 'debate_paused');
+            this.debatePaused = true;
+            this.debateActive = true;
+            this.updateUI('paused');
+            // Close SSE — resume will open a new one
+            if (this.eventSource) {
+                this.eventSource.close();
+                this.eventSource = null;
+            }
+            this.addSystemMessage('辩论已暂停');
+        });
+
         this.eventSource.addEventListener('debate_end', (e) => {
-            const data = JSON.parse(e.data);
+            const data = this._parseSSEData(e, 'debate_end');
+            if (!data) return;
             this.debateActive = false;
             this.debatePaused = false;
             this.updateUI('stopped');
             this.eventSource.close();
             this.eventSource = null;
-            const reasonMap = { 'Max rounds reached': '已达到最大轮次', 'Stopped by user': '用户手动停止' };
+            const reasonMap = { 'Max rounds reached': '已达到最大轮次' };
             this.addSystemMessage(`辩论结束：${reasonMap[data.reason] || data.reason}`);
 
             // Auto-trigger judge when debate ends naturally (max rounds reached)
@@ -337,7 +393,8 @@ class DebateApp {
         });
 
         this.eventSource.addEventListener('judge_chunk', (e) => {
-            const data = JSON.parse(e.data);
+            const data = this._parseSSEData(e, 'judge_chunk');
+            if (!data) return;
 
             // Create judge message if not exists
             if (!this.currentMessageEl || !this.currentMessageEl.dataset.judge) {
@@ -349,7 +406,7 @@ class DebateApp {
         });
 
         this.eventSource.addEventListener('judge_result', (e) => {
-            const data = JSON.parse(e.data);
+            this._parseSSEData(e, 'judge_result');
             this.finalizeMessage();
             // Judge is done — close SSE connection
             if (this.eventSource) {
@@ -450,15 +507,31 @@ class DebateApp {
 
         const time = new Date().toLocaleTimeString();
 
-        message.innerHTML = `
-            <div class="message-header">
-                <span class="message-avatar">👤</span>
-                <span class="message-sender">你</span>
-                <span class="message-time">${time}</span>
-            </div>
-            <div class="message-content">${this.escapeHtml(text)}</div>
-        `;
+        const header = document.createElement('div');
+        header.className = 'message-header';
 
+        const avatarEl = document.createElement('span');
+        avatarEl.className = 'message-avatar';
+        avatarEl.textContent = '👤';
+
+        const senderEl = document.createElement('span');
+        senderEl.className = 'message-sender';
+        senderEl.textContent = '你';
+
+        const timeEl = document.createElement('span');
+        timeEl.className = 'message-time';
+        timeEl.textContent = time;
+
+        header.appendChild(avatarEl);
+        header.appendChild(senderEl);
+        header.appendChild(timeEl);
+
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.textContent = text;
+
+        message.appendChild(header);
+        message.appendChild(content);
         this.messages.appendChild(message);
     }
 
@@ -494,9 +567,21 @@ class DebateApp {
 
         const label = document.createElement('div');
         label.className = 'tool-card-label';
-        label.innerHTML = '<span class="tool-card-toggle">▶</span> 🔍 Searched: ' + this.escapeHtml(query);
         label.title = 'Click to expand/collapse results';
         label.style.cursor = 'pointer';
+
+        const toggle = document.createElement('span');
+        toggle.className = 'tool-card-toggle';
+        toggle.textContent = '▶';
+
+        const labelText = document.createTextNode(' 🔍 Searched: ');
+
+        const querySpan = document.createElement('span');
+        querySpan.textContent = query;
+
+        label.appendChild(toggle);
+        label.appendChild(labelText);
+        label.appendChild(querySpan);
 
         const results = document.createElement('div');
         results.className = 'tool-card-results tool-card-collapsed';
@@ -528,18 +613,25 @@ class DebateApp {
     }
 
     renderContent(raw) {
-        // Protect [[Name]] patterns from marked.js before parsing.
-        // marked treats [[ as link reference syntax and mangles them.
-        const mentions = [];
-        const sanitized = raw.replace(/\[\[([^\]]+)\]\]/g, (match, name) => {
-            mentions.push(name);
-            return `%%MENTION_${mentions.length - 1}%%`;
-        });
-        const html = marked.parse(sanitized);
-        // Restore mentions as highlighted badges
-        return html.replace(/%%MENTION_(\d+)%%/g, (_, i) => {
-            return `<span class="mention">${this.escapeHtml(mentions[parseInt(i)])}</span>`;
-        });
+        try {
+            // Protect [[Name]] patterns from marked.js before parsing.
+            // marked treats [[ as link reference syntax and mangles them.
+            const mentions = [];
+            const sanitized = raw.replace(/\[\[([^\]]+)\]\]/g, (match, name) => {
+                mentions.push(name);
+                return `%%MENTION_${mentions.length - 1}%%`;
+            });
+            // marked.parse() renders markdown to HTML.
+            // Raw HTML in the input is escaped by our custom renderer (see top of file).
+            const html = marked.parse(sanitized);
+            // Restore mentions as highlighted badges
+            return html.replace(/%%MENTION_(\d+)%%/g, (_, i) => {
+                return `<span class="mention">${this.escapeHtml(mentions[parseInt(i)])}</span>`;
+            });
+        } catch (err) {
+            console.error('marked.parse failed, falling back to escaped text:', err);
+            return this.escapeHtml(raw);
+        }
     }
 
     scrollToBottom() {
@@ -557,12 +649,11 @@ class DebateApp {
             const response = await fetch('/api/debate/stop', { method: 'POST' });
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.detail || '暂停辩论失败');
             }
 
-            this.debatePaused = true;
-            this.updateUI('paused');
+            // State update is handled by the 'debate_paused' SSE event
 
         } catch (error) {
             console.error('Failed to stop debate:', error);
@@ -575,7 +666,7 @@ class DebateApp {
             const response = await fetch('/api/debate/resume', { method: 'POST' });
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.detail || '继续辩论失败');
             }
 
@@ -601,7 +692,7 @@ class DebateApp {
             });
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.detail || '发送消息失败');
             }
 
@@ -619,7 +710,7 @@ class DebateApp {
             const response = await fetch('/api/debate/judge', { method: 'POST' });
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.detail || '请求裁判失败');
             }
 
@@ -654,13 +745,23 @@ class DebateApp {
                 const color = el.querySelector('.message-sender')?.style.color || '#333';
                 const time = el.querySelector('.message-time')?.textContent || '';
                 // Tool cards use .tool-card-content, regular messages use .message-content
-                const content = el.querySelector('.message-content')?.innerHTML ||
-                                el.querySelector('.tool-card-content')?.innerHTML || '';
+                // Use raw dataset for debater messages (pre-markdown) when available,
+                // otherwise fall back to textContent for safety
+                const contentEl = el.querySelector('.message-content') ||
+                                  el.querySelector('.tool-card-content');
+                let content;
+                if (el.classList.contains('user') || el.classList.contains('system')) {
+                    content = this.escapeHtml(contentEl?.textContent || '');
+                } else if (contentEl?.dataset?.raw) {
+                    content = this.renderContent(contentEl.dataset.raw);
+                } else {
+                    content = this.escapeHtml(contentEl?.textContent || '');
+                }
                 const isUser = el.classList.contains('user');
                 const isToolCard = el.classList.contains('tool-card');
                 const cls = isUser ? 'user-msg' : (isToolCard ? 'tool-msg' : 'debater-msg');
                 body += `<div class="${cls}">
-  <div class="msg-header"><span class="avatar">${avatar}</span> <span class="sender" style="color:${color}">${this.escapeHtml(sender)}</span> <span class="time">${time}</span></div>
+  <div class="msg-header"><span class="avatar">${this.escapeHtml(avatar)}</span> <span class="sender" style="color:${color}">${this.escapeHtml(sender)}</span> <span class="time">${this.escapeHtml(time)}</span></div>
   <div class="msg-body">${content}</div>
 </div>\n`;
             }
@@ -735,7 +836,7 @@ ${body}
             });
 
             if (!response.ok) {
-                const error = await response.json();
+                const error = await response.json().catch(() => ({}));
                 throw new Error(error.detail || '创建辩手失败');
             }
 
@@ -764,6 +865,7 @@ ${body}
                 this.userInput.disabled = true;
                 this.sendBtn.disabled = true;
                 this.judgeBtn.disabled = true;
+                this.judgeBtn.hidden = true;
                 break;
 
             case 'debating':
@@ -773,6 +875,7 @@ ${body}
                 this.userInput.disabled = false;
                 this.sendBtn.disabled = false;
                 this.judgeBtn.disabled = true;
+                this.judgeBtn.hidden = true;
                 this.downloadBtn.disabled = false;
                 break;
 
@@ -783,6 +886,7 @@ ${body}
                 this.userInput.disabled = true;
                 this.sendBtn.disabled = true;
                 this.judgeBtn.disabled = true;
+                this.judgeBtn.hidden = true;
                 this.downloadBtn.disabled = false;
                 break;
 
@@ -793,6 +897,7 @@ ${body}
                 this.userInput.disabled = true;
                 this.sendBtn.disabled = true;
                 this.judgeBtn.disabled = false;
+                this.judgeBtn.hidden = false;
                 this.downloadBtn.disabled = false;
                 break;
         }
@@ -836,14 +941,19 @@ ${body}
     }
 
     _indexMessages() {
-        // Build searchable index from all rendered messages
+        // Build searchable index from all rendered messages (including tool cards)
         this._messageIndex = [];
         const msgEls = this.messages.querySelectorAll('.message');
         msgEls.forEach((el, idx) => {
-            const contentEl = el.querySelector('.message-content');
+            // Regular messages use .message-content, tool cards use .tool-card-content
+            const contentEl = el.querySelector('.message-content') ||
+                              el.querySelector('.tool-card-content');
             if (!contentEl) return;
 
-            const text = contentEl.innerText || '';
+            // Prefer raw markdown text (dataset.raw) when available for better
+            // matching of [[Name]] mentions and original markdown formatting.
+            // Fall back to innerText for user/system messages without raw data.
+            const text = contentEl.dataset.raw || contentEl.innerText || '';
             const sender = el.querySelector('.message-sender')?.textContent || '';
             const avatar = el.querySelector('.message-avatar')?.textContent || '';
             const time = el.querySelector('.message-time')?.textContent || '';

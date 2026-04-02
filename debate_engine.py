@@ -265,7 +265,7 @@ class DebateEngine:
         if self.state:
             await self.event_queue.put(
                 Event(
-                    type="debate_end",
+                    type="debate_paused",
                     payload={"reason": "Stopped by user"},
                 )
             )

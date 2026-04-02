@@ -14,8 +14,11 @@ def _make_engine(responses=None):
     # Create engine without calling __init__ to avoid creating real agents
     engine = object.__new__(DebateEngine)
     engine.model = "test:model"
+    engine.base_url = None
+    engine.api_key = None
     engine.brave_api_key = ""
     engine.debater_agent = mock
+    engine.debater_agent_no_search = mock
     engine.judge_agent = MockDebateAgent(responses=responses or ["Judgment."])
     engine.state = None
     engine.event_queue = asyncio.Queue()
@@ -379,18 +382,22 @@ def test_update_model_recreates_agents():
     from unittest.mock import patch
 
     with patch("debate_engine.create_debater_agent") as mock_debater_creator, patch(
+        "debate_engine.create_debater_agent_no_search"
+    ) as mock_no_search_creator, patch(
         "debate_engine.create_judge_agent"
     ) as mock_judge_creator:
         mock_debater_creator.return_value = MockDebateAgent()
+        mock_no_search_creator.return_value = MockDebateAgent()
         mock_judge_creator.return_value = MockDebateAgent()
 
-        engine.update_model("new:model")
+        engine.update_model("new:model", None, None)
 
         assert engine.model == "new:model"
         assert engine.debater_agent is not old_debater
         assert engine.judge_agent is not old_judge
-        mock_debater_creator.assert_called_once_with("new:model")
-        mock_judge_creator.assert_called_once_with("new:model")
+        mock_debater_creator.assert_called_once_with("new:model", None, None)
+        mock_no_search_creator.assert_called_once_with("new:model", None, None)
+        mock_judge_creator.assert_called_once_with("new:model", None, None)
 
 
 @pytest.mark.asyncio
