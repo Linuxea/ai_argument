@@ -7,6 +7,7 @@ class DebateApp {
         this._currentDebaterName = null;
         this._currentDebaterColor = null;
         this._currentDebaterAvatar = null;
+        this._lastSpeakerName = null;  // Track last speaker for merging headers
         this.init();
     }
 
@@ -214,6 +215,7 @@ class DebateApp {
 
             // Clear messages
             this.messages.innerHTML = '';
+            this._lastSpeakerName = null;  // Reset for new debate
             this.chatTitle.textContent = topic;
 
             // Start debate
@@ -338,27 +340,30 @@ class DebateApp {
     createMessage(name, color, avatar, type = 'debater') {
         const message = document.createElement('div');
         message.className = 'message ai';
+        message.dataset.speaker = name;
 
         const time = new Date().toLocaleTimeString();
+        const isConsecutive = (this._lastSpeakerName === name);
 
         const header = document.createElement('div');
-        header.className = 'message-header';
+        header.className = isConsecutive ? 'message-header minimal' : 'message-header';
 
-        const avatarEl = document.createElement('span');
-        avatarEl.className = 'message-avatar';
-        avatarEl.textContent = avatar;
+        if (!isConsecutive) {
+            const avatarEl = document.createElement('span');
+            avatarEl.className = 'message-avatar';
+            avatarEl.textContent = avatar;
+            header.appendChild(avatarEl);
 
-        const senderEl = document.createElement('span');
-        senderEl.className = 'message-sender';
-        senderEl.style.color = this.sanitizeColor(color);
-        senderEl.textContent = name;
+            const senderEl = document.createElement('span');
+            senderEl.className = 'message-sender';
+            senderEl.style.color = this.sanitizeColor(color);
+            senderEl.textContent = name;
+            header.appendChild(senderEl);
+        }
 
         const timeEl = document.createElement('span');
         timeEl.className = 'message-time';
         timeEl.textContent = time;
-
-        header.appendChild(avatarEl);
-        header.appendChild(senderEl);
         header.appendChild(timeEl);
 
         const content = document.createElement('div');
@@ -369,6 +374,7 @@ class DebateApp {
 
         this.messages.appendChild(message);
         this.currentMessageEl = content;
+        this._lastSpeakerName = name;
     }
 
     appendToMessage(text) {
@@ -429,25 +435,29 @@ class DebateApp {
     addToolCard(debaterName, query, resultSummary) {
         const message = document.createElement('div');
         message.className = 'message ai tool-card';
+        message.dataset.speaker = debaterName;
+
+        const isConsecutive = (this._lastSpeakerName === debaterName);
 
         const header = document.createElement('div');
-        header.className = 'message-header';
+        header.className = isConsecutive ? 'message-header minimal' : 'message-header';
 
-        const avatarEl = document.createElement('span');
-        avatarEl.className = 'message-avatar';
-        avatarEl.textContent = this._currentDebaterAvatar || '🔍';
+        if (!isConsecutive) {
+            const avatarEl = document.createElement('span');
+            avatarEl.className = 'message-avatar';
+            avatarEl.textContent = this._currentDebaterAvatar || '🔍';
+            header.appendChild(avatarEl);
 
-        const senderEl = document.createElement('span');
-        senderEl.className = 'message-sender';
-        senderEl.style.color = this.sanitizeColor(this._currentDebaterColor || '#333333');
-        senderEl.textContent = debaterName;
+            const senderEl = document.createElement('span');
+            senderEl.className = 'message-sender';
+            senderEl.style.color = this.sanitizeColor(this._currentDebaterColor || '#333333');
+            senderEl.textContent = debaterName;
+            header.appendChild(senderEl);
+        }
 
         const timeEl = document.createElement('span');
         timeEl.className = 'message-time';
         timeEl.textContent = new Date().toLocaleTimeString();
-
-        header.appendChild(avatarEl);
-        header.appendChild(senderEl);
         header.appendChild(timeEl);
 
         const content = document.createElement('div');
@@ -474,6 +484,7 @@ class DebateApp {
         message.appendChild(header);
         message.appendChild(content);
         this.messages.appendChild(message);
+        this._lastSpeakerName = debaterName;
         this.scrollToBottom();
     }
 

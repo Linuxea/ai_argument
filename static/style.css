@@ -590,6 +590,17 @@ button:disabled {
     color: var(--text-muted);
 }
 
+/* Minimal header for consecutive messages from same speaker */
+.message-header.minimal {
+    justify-content: flex-end;
+    padding-top: 4px;
+}
+
+.message-header.minimal .message-time {
+    font-size: 0.65rem;
+    opacity: 0.7;
+}
+
 .message-content {
     background: var(--bg-elevated);
     padding: 14px 18px;
