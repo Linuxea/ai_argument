@@ -31,7 +31,7 @@ class DebateApp {
         this.apiUrl = document.getElementById('api-url');
         this.apiKey = document.getElementById('api-key');
         this.modelName = document.getElementById('model-name');
-        this.saveSettingsBtn = document.getElementById('save-settings-btn');
+        this._apiDebounceTimer = null;  // For debouncing API input changes
 
         // Control buttons
         this.startBtn = document.getElementById('start-btn');
@@ -70,8 +70,9 @@ class DebateApp {
         this.stopBtn.addEventListener('click', () => this.stopDebate());
         this.resumeBtn.addEventListener('click', () => this.resumeDebate());
 
-        // Settings
-        this.saveSettingsBtn.addEventListener('click', () => this.saveSettings());
+        // API settings - auto-save and auto-fetch models with debounce
+        this.apiUrl.addEventListener('input', () => this.onApiInputChanged());
+        this.apiKey.addEventListener('input', () => this.onApiInputChanged());
 
         // Custom debater
         this.addDebaterBtn.addEventListener('click', () => this.addCustomDebater());
@@ -831,36 +832,52 @@ ${body}
         }
     }
 
-    async saveSettings() {
+    onApiInputChanged() {
+        // Debounce: wait 500ms after user stops typing
+        clearTimeout(this._apiDebounceTimer);
+        this._apiDebounceTimer = setTimeout(() => this.syncApiSettings(), 500);
+    }
+
+    async syncApiSettings() {
+        const apiUrl = this.apiUrl.value.trim();
+        const apiKey = this.apiKey.value.trim();
+
+        // Clear model list if either field is empty
+        if (!apiUrl || !apiKey) {
+            this.modelName.innerHTML = '<option value="">-- 输入 API 后自动获取 --</option>';
+            localStorage.setItem('api_url', apiUrl);
+            localStorage.setItem('api_key', apiKey);
+            return;
+        }
+
         try {
+            // Save to backend
             const response = await fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    api_url: this.apiUrl.value,
-                    api_key: this.apiKey.value,
+                    api_url: apiUrl,
+                    api_key: apiKey,
                     model_name: this.modelName.value
                 })
             });
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || '保存设置失败');
+                console.error('Failed to save settings:', error.detail);
+                return;
             }
 
-            // Also cache to localStorage for page reloads
-            localStorage.setItem('api_url', this.apiUrl.value);
-            localStorage.setItem('api_key', this.apiKey.value);
+            // Cache to localStorage
+            localStorage.setItem('api_url', apiUrl);
+            localStorage.setItem('api_key', apiKey);
             localStorage.setItem('model_name', this.modelName.value);
             localStorage.setItem('max_rounds', this.maxRoundsInput.value);
 
-            // Fetch available models and populate dropdown
+            // Fetch available models
             await this.fetchModels();
-
-            alert('设置已保存并生效。');
         } catch (error) {
-            console.error('Failed to save settings:', error);
-            alert(error.message);
+            console.error('Failed to sync settings:', error);
         }
     }
 
