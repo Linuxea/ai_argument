@@ -487,7 +487,13 @@ class DebateApp {
     }
 
     scrollToBottom() {
-        this.messages.scrollTop = this.messages.scrollHeight;
+        // Only auto-scroll if user is near the bottom (within 150px).
+        // If they scrolled up to read, don't force them back down.
+        const threshold = 150;
+        const distFromBottom = this.messages.scrollHeight - this.messages.scrollTop - this.messages.clientHeight;
+        if (distFromBottom < threshold) {
+            this.messages.scrollTop = this.messages.scrollHeight;
+        }
     }
 
     async stopDebate() {
