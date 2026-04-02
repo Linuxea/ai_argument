@@ -42,7 +42,7 @@
     --font-mono:    'Source Code Pro', monospace;
 
     /* Sizing */
-    --sidebar-w:     320px;
+    --sidebar-w:     380px;
     --radius-sm:     8px;
     --radius-md:     12px;
     --radius-lg:     16px;
@@ -145,6 +145,14 @@ body {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
+}
+
+.sidebar-section input[type="text"],
+.sidebar-section input[type="password"],
+.sidebar-section input[type="number"],
+.sidebar-section textarea,
+.sidebar-section select {
+    width: 100%;
 }
 
 .sidebar-section label {
