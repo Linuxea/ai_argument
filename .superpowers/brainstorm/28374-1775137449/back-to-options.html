@@ -1,0 +1,51 @@
+<h2>改造方案</h2>
+<p class="subtitle">基于你的反馈，我设计了三种不同程度的改造方案</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>轻量重构</h3>
+      <p>保持现有结构，优化视觉细节</p>
+      <ul style="margin-top:12px;font-size:0.85rem;color:#666;padding-left:16px">
+        <li>统一侧边栏区块的间距、边框、背景</li>
+        <li>优化消息卡片的视觉层级（辩手/用户/系统）</li>
+        <li>增加留白，减少视觉噪音</li>
+        <li>更换字体为 Merriweather + Source Sans Pro</li>
+      </ul>
+      <p style="margin-top:8px;font-size:0.75rem;color:#888">改动最小，风险低</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>中度重构</h3>
+      <p>重新组织侧边栏，优化信息架构</p>
+      <ul style="margin-top:12px;font-size:0.85rem;color:#666;padding-left:16px">
+        <li>侧边栏分组：配置区 / 辩手区 / 操作区</li>
+        <li>辩手卡片重新设计：更紧凑、更清晰</li>
+        <li>消息区采用"对话气泡"风格，而非卡片</li>
+        <li>移除冗余视觉元素（过多边框、阴影）</li>
+      </ul>
+      <p style="margin-top:8px;font-size:0.75rem;color:#888">平衡改动与效果</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>深度重构</h3>
+      <p>完全重新设计界面架构</p>
+      <ul style="margin-top:12px;font-size:0.85rem;color:#666;padding-left:16px">
+        <li>移除侧边栏，采用顶部工具栏 + 全屏辩论区</li>
+        <li>辩手信息以"徽章"形式浮动显示</li>
+        <li>消息采用时间线布局，强调对话流动感</li>
+        <li>极简主义，大量留白</li>
+      </ul>
+      <p style="margin-top:8px;font-size:0.75rem;color:#888">改动最大，效果最显著</p>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:24px;color:#888;font-size:0.85rem">点击选择你倾向的改造程度</p>

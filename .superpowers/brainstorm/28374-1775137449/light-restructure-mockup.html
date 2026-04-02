@@ -1,0 +1,165 @@
+<h2>轻量重构方案</h2>
+<p class="subtitle">保持结构，优化视觉细节， 更换字体</p>
+
+<div class="split">
+  <!-- Before -->
+  <div class="mockup">
+    <div class="mockup-label">当前</div>
+    <div class="mockup-body" style="background:#f5f1ea">
+      <!-- Sidebar -->
+      <div style="position:absolute;left:0;top:0;bottom:0;width:140px;background:#faf8f4;border-right:1px solid #ddd7cc;padding:12px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-family:'Playfair Display',serif;font-size:0.9rem;font-weight:700;text-align:center;color:#1a1714;padding-bottom:8px;border-bottom:2px solid #c0503a">AI 辩论</div>
+        <div style="font-size:0.5rem;color:#9a9183;text-transform:uppercase;letter-spacing:0.1em">主题</div>
+        <div style="background:#f0ece4;border-radius:4px;height:32px;border:1px solid #ddd7cc"></div>
+        <div style="font-size:0.5rem;color:#9a9183;text-transform:uppercase;letter-spacing:0.1em;margin-top:4px">辩手</div>
+        <div style="background:#fff;border-radius:4px;padding:6px 8px;border:1px solid #ddd7cc;font-size:0.6rem;display:flex;align-items:center;gap:4px">
+          <span>⠿</span><span style="width:12px;height:12px;background:#fee"></span><span style="flex:1">质疑者</span>
+        </div>
+        <div style="background:#fff;border-radius:4px;padding:6px 8px;border:1px solid #ddd7cc;font-size:0.6rem;display:flex;align-items:center;gap:4px">
+          <span>⠿</span><span style="width:12px;height:12px;background:#efe"></span><span style="flex:1">乐观派</span>
+        </div>
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
+          <div style="background:#c0503a;color:#fff;padding:8px;border-radius:4px;font-size:0.65rem;text-align:center">开始辩论</div>
+          <div style="background:#fff;padding:8px;border-radius:4px;font-size:0.65rem;text-align:center;border:1px solid #ddd7cc">暂停</div>
+        </div>
+      </div>
+      <!-- Chat area -->
+      <div style="margin-left:140px;padding:16px;display:flex;flex-direction:column;gap:12px;height:100%;overflow-y:auto">
+        <div style="font-family:'Playfair Display',serif;font-size:0.8rem;font-weight:700;color:#1a1714;margin-bottom:8px">输入主题开始辩论</div>
+        <!-- Message -->
+        <div style="display:flex;gap:8px;align-items:flex-start;max-width:85%">
+          <div style="width:28px;height:28px;background:#fee;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.9rem">🔴</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span style="font-family:'Playfair Display',serif;font-size:0.65rem;font-weight:700;color:#c0503a">质疑者</span>
+              <span style="font-size:0.55rem;color:#9a9183">14:32</span>
+            </div>
+            <div style="background:#fff;padding:10px 12px;border-radius:6px;border-left:2px solid #c0503a;font-size:0.7rem;color:#333;line-height:1.5;box-shadow:0 1px 2px rgba(80,65,40,0.06)">div>
+              <p style="margin:0">我认为这个论点存在根本性的逻辑缺陷。首先，样本偏差是一个严重的问题...</p>
+            </div>
+          </div>
+        </div>
+        <!-- Another message -->
+        <div style="display:flex;gap:8px;align-items:flex-start;max-width:85%;margin-top:8px">
+          <div style="width:28px;height:28px;background:#efe;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.9rem">🟢</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span style="font-family:'Playfair Display',serif;font-size:0.65rem;font-weight:700;color:#2a7a6e">乐观派</span>
+              <span style="font-size:0.55rem;color:#9a9183">14:33</span>
+            </div>
+            <div style="background:#fff;padding:10px 12px;border-radius:6px;border-left:2px solid #2a7a6e;font-size:0.7rem;color:#333;line-height:1.5;box-shadow:0 1px 2px rgba(80,65,40,0.06)">
+              <p style="margin:0">从历史数据来看，这种做法利大于弊...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- After -->
+  <div class="mockup">
+    <div class="mockup-label">轻量重构后</div>
+    <div class="mockup-body" style="background:#f8f5ef">
+      <!-- Sidebar -->
+      <div style="position:absolute;left:0;top:0;bottom:0;width:140px;background:#fdfcfa;border-right:1px solid #e8e0d4;padding:14px;display:flex;flex-direction:column;gap:14px">
+        <div style="font-family:'Merriweather',serif;font-size:0.85rem;font-weight:700;text-align:center;color:#5c4a32;padding-bottom:10px;border-bottom:2px solid #a67c52;letter-spacing:0.01em">AI 辩论</div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          <div style="font-size:0.5rem;color:#8b7355;text-transform:uppercase;letter-spacing:0.12em;font-weight:600">辩论主题</div>
+          <div style="background:#fff;border-radius:6px;height:36px;border:1px solid #d9cfc0;box-shadow:0 1px 2px rgba(166,124,82,0.06)"></div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+          <div style="font-size:0.5rem;color:#8b7355;text-transform:uppercase;letter-spacing:0.12em;font-weight:600">辩手</div>
+          <div style="background:#fff;border-radius:6px;padding:8px 10px;border:1px solid #d9cfc0;font-size:0.6rem;display:flex;align-items:center;gap:6px;box-shadow:0 1px 2px rgba(166,124,82,0.04)">
+            <span style="color:#a67c52">⠿</span><span style="width:14px;height:14px;background:#fef6f6;border-radius:4px;display:flex;align-items:center;justify-content:center">🔴</span><span style="flex:1;font-weight:500">质疑者</span><span style="font-size:0.5rem;background:#fef6f6;padding:2px 6px;border-radius:10px;color:#c0503a">against</span>
+          </div>
+          <div style="background:#fff;border-radius:6px;padding:8px 10px;border:1px solid #d9cfc0;font-size:0.6rem;display:flex;align-items:center;gap:6px;box-shadow:0 1px 2px rgba(166,124,82,0.04)">
+            <span style="color:#a67c52">⠿</span><span style="width:14px;height:14px;background:#f0f9f4;border-radius:4px;display:flex;align-items:center;justify-content:center">🟢</span><span style="flex:1;font-weight:500">乐观派</span><span style="font-size:0.5rem;background:#f0f9f4;padding:2px 6px;border-radius:10px;color:#2a7a6e">for</span>
+          </div>
+        </div>
+
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+          <div style="background:linear-gradient(135deg,#a67c52,#8b5a3c);color:#fff;padding:10px;border-radius:6px;font-size:0.65rem;text-align:center;font-weight:600;letter-spacing:0.02em;box-shadow:0 2px 8px rgba(166,124,82,0.25)">开始辩论</div>
+          <div style="background:#fff;padding:8px;border-radius:6px;font-size:0.65rem;text-align:center;border:1px solid #d9cfc0;color:#8b7355">暂停</div>
+        </div>
+      </div>
+      <!-- Chat area -->
+      <div style="margin-left:140px;padding:20px;display:flex;flex-direction:column;gap:16px;height:100%;overflow-y:auto">
+        <div style="font-family:'Merriweather',serif;font-size:0.85rem;font-weight:700;color:#5c4a32;margin-bottom:12px;letter-spacing:0.01em">人工智能是否通过图灵测试</div>
+
+        <!-- Message with more breathing room -->
+        <div style="display:flex;gap:10px;align-items:flex-start;max-width:88%;animation:fadeIn 0.3s ease">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <div style="width:32px;height:32px;background:linear-gradient(135deg,#fef6f6,#fce8e8);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;box-shadow:0 2px 6px rgba(192,80,58,0.15)">🔴</div>
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-family:'Merriweather',serif;font-size:0.7rem;font-weight:700;color:#c0503a">质疑者</span>
+              <span style="font-size:0.55rem;color:#a0a0a0;background:#f5f2eb;padding:2px 6px;border-radius:4px">14:32</span>
+            </div>
+            <div style="background:#fff;padding:14px 16px;border-radius:8px;border-left:3px solid #c0503a;font-size:0.75rem;color:#3d3629;line-height:1.7;box-shadow:0 2px 6px rgba(166,124,82,0.08)">
+              <p style="margin:0">我认为这个论点存在根本性的逻辑缺陷。</p>
+              <p style="margin:8px 0 0 0;color:#6b5d4d">首先，样本偏差是一个严重的问题。我们需要更严谨的控制变量...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Another message -->
+        <div style="display:flex;gap:10px;align-items:flex-start;max-width:88%;animation:fadeIn 0.3s ease">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <div style="width:32px;height:32px;background:linear-gradient(135deg,#f0f9f4,#e6f4ea);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;box-shadow:0 2px 6px rgba(42,122,110,0.15)">🟢</div>
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-family:'Merriweather',serif;font-size:0.7rem;font-weight:700;color:#2a7a6e">乐观派</span>
+              <span style="font-size:0.55rem;color:#a0a0a0;background:#f5f2eb;padding:2px 6px;border-radius:4px">14:33</span>
+            </div>
+            <div style="background:#fff;padding:14px 16px;border-radius:8px;border-left:3px solid #2a7a6e;font-size:0.75rem;color:#3d3629;line-height:1.7;box-shadow:0 2px 6px rgba(166,124,82,0.08)">
+              <p style="margin:0">从历史数据来看，这种做法利大于弊。</p>
+              <p style="margin:8px 0 0 0;color:#6b5d4d">让我们看看几个成功的案例...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- System message -->
+        <div style="display:flex;justify-content:center;margin:8px 0">
+          <div style="font-size:0.65rem;color:#a0a0a0;font-style:italic;background:#faf7f2;padding:4px 12px;border-radius:12px">
+            — 第 1 轮结束 —
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:32px;padding:20px;background:#fdfcfa;border-radius:8px;border:1px solid #e8e0d4">
+  <h3 style="font-size:0.9rem;margin-bottom:12px;color:#5c4a32">具体优化点</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:0.8rem;color:#6b5d4d">
+    <div>
+      <ul style="padding-left:16px;line-height:1.8">
+        <li>字体换为 Merriweather + Source Sans Pro</li>
+        <li>增加留白，消息间距从 12px → 16px</li>
+        <li>侧边栏区块间距统一为 14px</li>
+        <li>标签使用更温暖的金棕色调</li>
+      </ul>
+    </div>
+    <div>
+      <ul style="padding-left:16px;line-height:1.8">
+        <li>消息卡片阴影更柔和</li>
+        <li>头像添加渐变背景和阴影</li>
+        <li>时间戳改为胶囊样式</li>
+        <li>stance 标签改为圆角胶囊</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:24px;color:#888;font-size:0.85rem">这个轻量方案如何？满意的话我们可以开始实施。</p>
+
+<style>
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
