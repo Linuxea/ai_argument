@@ -119,7 +119,14 @@ class DebateEngine:
 
         async for event in event_stream:
             if isinstance(event, FunctionToolCallEvent):
-                current_query = event.part.args.get("query", "")
+                args = event.part.args
+                if isinstance(args, str):
+                    import json
+                    try:
+                        args = json.loads(args)
+                    except (json.JSONDecodeError, TypeError):
+                        args = {}
+                current_query = args.get("query", "") if isinstance(args, dict) else ""
             elif isinstance(event, FunctionToolResultEvent):
                 result_text = ""
                 if event.result and event.result.content:
