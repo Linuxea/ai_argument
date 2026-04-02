@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=8">
+    <link rel="stylesheet" href="/static/style.css?v=9">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -16,7 +16,10 @@
         <aside class="sidebar">
             <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:18px;border-bottom:2px solid var(--terracotta)">
                 <h1 style="border:none;padding:0">AI 辩论</h1>
-                <button class="theme-toggle" id="theme-toggle" title="切换主题">🌙</button>
+                <div style="display:flex;gap:4px">
+                    <button class="icon-btn" id="settings-btn" title="设置">⚙️</button>
+                    <button class="icon-btn" id="theme-toggle" title="切换主题">🌙</button>
+                </div>
             </div>
 
             <section class="sidebar-section">
@@ -31,16 +34,6 @@
             <section class="sidebar-section">
                 <label>辩手</label>
                 <div id="debater-list"></div>
-            </section>
-
-            <section class="sidebar-section">
-                <label>API 设置</label>
-                <input type="text" id="api-url" placeholder="API 地址（默认：https://api.deepseek.com）" value="">
-                <input type="password" id="api-key" placeholder="API 密钥（默认：$DEEPSEEK_API_KEY）" value="">
-                <select id="model-name">
-                    <option value="">-- 保存后获取模型列表 --</option>
-                </select>
-                <button id="save-settings-btn">保存设置</button>
             </section>
 
             <section class="sidebar-section">
@@ -80,8 +73,25 @@
                 <button id="send-btn" disabled>发送</button>
             </div>
         </main>
+
+        <div class="settings-backdrop" id="settings-backdrop" aria-hidden="true"></div>
+        <div class="settings-panel" id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <div class="settings-panel-header">
+                <h3 id="settings-title">设置</h3>
+                <button class="icon-btn" id="settings-close" title="关闭" aria-label="关闭设置面板">✕</button>
+            </div>
+            <section class="sidebar-section">
+                <label>API 设置</label>
+                <input type="text" id="api-url" placeholder="API 地址（默认：https://api.deepseek.com）" value="">
+                <input type="password" id="api-key" placeholder="API 密钥（默认：$DEEPSEEK_API_KEY）" value="">
+                <select id="model-name">
+                    <option value="">-- 保存后获取模型列表 --</option>
+                </select>
+                <button id="save-settings-btn">保存设置</button>
+            </section>
+        </div>
     </div>
 
-    <script src="/static/app.js?v=9"></script>
+    <script src="/static/app.js?v=10"></script>
 </body>
 </html>

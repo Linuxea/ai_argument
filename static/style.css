@@ -97,9 +97,9 @@ html.dark #download-btn:hover:not(:disabled) {
     background: rgba(122, 148, 174, 0.10);
 }
 
-/* ─── Theme Toggle ─────────────────────────────────── */
+/* ─── Icon Buttons ─────────────────────────────────── */
 
-.theme-toggle {
+.icon-btn {
     background: none;
     border: none;
     font-size: 1.15rem;
@@ -111,9 +111,60 @@ html.dark #download-btn:hover:not(:disabled) {
     line-height: 1;
 }
 
-.theme-toggle:hover {
+.icon-btn:hover {
     color: var(--text);
     background: var(--bg-input);
+}
+
+/* ─── Settings Panel ──────────────────────────────── */
+
+.settings-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 90;
+}
+
+.settings-backdrop.open { display: block; }
+
+.settings-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 340px;
+    height: 100vh;
+    background: var(--bg-surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 28px 22px;
+    overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.settings-panel.open {
+    transform: translateX(0);
+}
+
+.settings-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--terracotta);
+}
+
+.settings-panel-header h3 {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.04em;
 }
 
 /* ─── Base ─────────────────────────────────────────── */

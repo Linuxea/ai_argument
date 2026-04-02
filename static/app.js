@@ -52,6 +52,12 @@ class DebateApp {
 
         // Theme
         this.themeToggle = document.getElementById('theme-toggle');
+
+        // Settings panel
+        this.settingsBtn = document.getElementById('settings-btn');
+        this.settingsClose = document.getElementById('settings-close');
+        this.settingsPanel = document.getElementById('settings-panel');
+        this.settingsBackdrop = document.getElementById('settings-backdrop');
     }
 
     bindEventListeners() {
@@ -80,6 +86,16 @@ class DebateApp {
 
         // Theme
         this.themeToggle.addEventListener('click', () => this.toggleTheme());
+
+        // Settings panel
+        this.settingsBtn.addEventListener('click', () => this.openSettings());
+        this.settingsClose.addEventListener('click', () => this.closeSettings());
+        this.settingsBackdrop.addEventListener('click', () => this.closeSettings());
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.settingsPanel.classList.contains('open')) {
+                this.closeSettings();
+            }
+        });
     }
 
     async loadDebaters() {
@@ -663,6 +679,20 @@ ${body}
 
     _updateThemeIcon(isDark) {
         if (this.themeToggle) this.themeToggle.textContent = isDark ? '☀️' : '🌙';
+    }
+
+    openSettings() {
+        this.settingsPanel.classList.add('open');
+        this.settingsBackdrop.classList.add('open');
+        this.settingsBackdrop.setAttribute('aria-hidden', 'false');
+        setTimeout(() => this.apiUrl.focus(), 50);
+    }
+
+    closeSettings() {
+        this.settingsPanel.classList.remove('open');
+        this.settingsBackdrop.classList.remove('open');
+        this.settingsBackdrop.setAttribute('aria-hidden', 'true');
+        this.settingsBtn.focus();
     }
 
     async loadSettings() {
