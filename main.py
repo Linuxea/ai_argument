@@ -152,13 +152,23 @@ async def judge_debate():
 @app.get("/api/models")
 async def list_models():
     """Fetch available models from the configured API provider."""
+    if not settings.api_key:
+        raise HTTPException(status_code=400, detail="请先输入 API Key")
+
     try:
         client = AsyncOpenAI(base_url=settings.api_base_url, api_key=settings.api_key)
         models = await client.models.list()
         model_ids = sorted([m.id for m in models.data])
         return {"models": model_ids}
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch models: {str(e)}")
+        error_msg = str(e)
+        # Provide user-friendly error messages
+        if "401" in error_msg or "authentication" in error_msg.lower():
+            raise HTTPException(status_code=401, detail="API Key 无效，请检查")
+        elif "404" in error_msg:
+            raise HTTPException(status_code=404, detail=f"API URL 不正确或该提供商不支持模型列表接口。当前 URL: {settings.api_base_url}")
+        else:
+            raise HTTPException(status_code=502, detail=f"获取模型列表失败: {error_msg}")
 
 
 @app.post("/api/settings")
@@ -167,7 +177,11 @@ async def update_settings(api_settings: ApiSettings):
     global debate_engine
 
     if api_settings.api_url:
-        settings.api_base_url = api_settings.api_url
+        # Normalize URL: ensure it ends with /v1 for OpenAI-compatible APIs
+        url = api_settings.api_url.rstrip('/')
+        if not url.endswith('/v1'):
+            url = f"{url}/v1"
+        settings.api_base_url = url
     if api_settings.api_key:
         settings.api_key = api_settings.api_key
     if api_settings.model_name:

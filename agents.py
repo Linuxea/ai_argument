@@ -23,22 +23,49 @@ SEARCH_INSTRUCTIONS = """\
 
 ## Web Search Tool
 
-You have a `web_search` tool you can call to look up real-time information on the internet.
+You have access to a `web_search` function for real-time information.
 
-CRITICAL: When you decide you need facts, you MUST actually CALL the `web_search` function. \
-Do NOT just write "let me search" or "I will look this up" in your text — that does nothing. \
-You must invoke the tool.
+**IMPORTANT: Check the current date shown above. When searching, prefer results from \
+the current year. Include the year in your query when looking for recent data.**
 
-**How to search:**
-1. First, write one sentence explaining WHY you are searching. Example: \
-"Let me check the latest data on renewable energy costs to respond to that claim."
-2. Then immediately CALL `web_search` with a concise query. Do NOT hesitate.
-3. After you receive the results, continue your argument using what you found.
+### Round-Based Search Strategy
 
-**When to search:** When you need statistics, recent events, verifiable data, or when an opponent \
-makes a factual claim you suspect is wrong. If you are unsure about a number or fact — search.
-**When NOT to search:** For common knowledge, your own reasoning, or general argumentation. \
-Do not search every turn — only when real data would strengthen your case.
+**First Round (Opening):** This is your ONLY chance to build a knowledge foundation. \
+Search actively to gather current facts, recent developments, and key data about the \
+debate topic. A well-informed opening argument is worth the search cost.
+
+**Later Rounds:** Switch to strict conservation mode. Search is now a last resort — \
+rely on reasoning and the information you've already gathered.
+
+### When to Search in Later Rounds (Narrow Cases)
+
+From round 2 onward, only call `web_search` when ALL of these conditions are met:
+
+1. **A specific factual claim is central** to the current exchange
+2. **The claim is verifiable** (not a matter of opinion or prediction)
+3. **You genuinely cannot proceed** without this information
+4. **The claim is surprising or controversial** (not common knowledge)
+
+### When NOT to Search
+
+- General argumentation and logical reasoning
+- Common knowledge (even if you're slightly fuzzy on details)
+- Historical events that are well-established
+- Making analogies or thought experiments
+- Responding to opinions, predictions, or value judgments
+- "I want to double-check" or "It would be nice to have data"
+- **When in doubt: argue, don't search.**
+
+### Rate Limit (Later Rounds)
+
+From round 2 onward, search **at most once per debate round**. If you've already \
+searched this round, rely on reasoning and existing knowledge.
+
+### How to Search
+
+1. Briefly state what you're looking for: "Let me check the latest data on..."
+2. CALL `web_search` with a targeted query — **include the current year** if recency matters
+3. Use the result directly in your argument
 """
 
 STANCE_INSTRUCTIONS = {
@@ -109,10 +136,24 @@ def create_debater_agent_no_search(model_name: str, base_url: str | None = None,
 
 def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
     """Build system instructions from deps. Called fresh on every run."""
+    from datetime import datetime
+
     debater = ctx.deps.debater
     stance = STANCE_INSTRUCTIONS.get(debater.stance, STANCE_INSTRUCTIONS["neutral"])
 
+    # Build date context with strong emphasis on current year
+    now = datetime.now()
+    current_year = now.year
+    current_date = now.strftime("%Y-%m-%d")
+    date_context = (
+        f"**CURRENT DATE: {current_date}**\n"
+        f"The current year is **{current_year}**. "
+        f"When discussing 'recent' or 'current' events, this means {current_year}. "
+        f"Any information dated before {current_year} may be outdated."
+    )
+
     parts = [
+        date_context,  # Move to FIRST position for maximum visibility
         DEBATE_RULES,
         f"Your stance: {stance}",
         debater.personality,

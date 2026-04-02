@@ -908,6 +908,8 @@ ${body}
             if (!resp.ok) {
                 const err = await resp.json();
                 console.error('Failed to fetch models:', err.detail);
+                // Show error in the dropdown
+                this.modelName.innerHTML = `<option value="">-- ${err.detail} --</option>`;
                 return;
             }
             const data = await resp.json();
@@ -925,6 +927,7 @@ ${body}
             }
         } catch (err) {
             console.error('Failed to fetch models:', err);
+            this.modelName.innerHTML = '<option value="">-- 网络错误 --</option>';
         }
     }
 
