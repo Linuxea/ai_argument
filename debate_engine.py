@@ -1,10 +1,11 @@
 import asyncio
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from pydantic_ai import FunctionToolCallEvent, FunctionToolResultEvent
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai import AgentRunResultEvent, FunctionToolCallEvent, FunctionToolResultEvent
+from pydantic_ai.messages import ModelMessage, PartDeltaEvent, TextPartDelta
 from models import Debater
 from agents import create_debater_agent, create_judge_agent, DebaterDeps
 
@@ -113,36 +114,14 @@ class DebateEngine:
             parts.append(f"[{msg.speaker}]: {msg.content}")
         return "\n\n".join(parts)
 
-    async def _handle_events(self, ctx, event_stream, debater_name: str):
-        """Monitor agent execution, emit SSE events for tool calls."""
-        current_query = ""
-
-        async for event in event_stream:
-            if isinstance(event, FunctionToolCallEvent):
-                args = event.part.args
-                if isinstance(args, str):
-                    import json
-                    try:
-                        args = json.loads(args)
-                    except (json.JSONDecodeError, TypeError):
-                        args = {}
-                current_query = args.get("query", "") if isinstance(args, dict) else ""
-            elif isinstance(event, FunctionToolResultEvent):
-                result_text = ""
-                if event.result and event.result.content:
-                    result_text = str(event.result.content)[:200]
-                await self.event_queue.put(Event(
-                    type="tool_call",
-                    payload={
-                        "debater_name": debater_name,
-                        "tool_name": "web_search",
-                        "query": current_query,
-                        "result_summary": result_text,
-                    },
-                ))
-
     async def run_turn(self):
-        """Execute a single debater's turn."""
+        """Execute a single debater's turn.
+
+        Uses ``run_stream_events`` instead of ``run_stream`` so that tool
+        calls are fully executed even when the model returns text *and* a
+        tool call in the same response (``run_stream`` would treat the text
+        as final output and skip the tool).
+        """
         if not self.state or not self.state.active:
             return
 
@@ -168,13 +147,16 @@ class DebateEngine:
         )
 
         full_text = ""
-        async with self.debater_agent.run_stream(
+        current_query = ""
+        result_all_messages = None
+
+        async for event in self.debater_agent.run_stream_events(
             user_prompt,
             deps=deps,
             message_history=self._history[debater.name],
-            event_stream_handler=lambda ctx, es: self._handle_events(ctx, es, debater.name),
-        ) as result:
-            async for delta in result.stream_text(delta=True):
+        ):
+            if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                delta = event.delta.content_delta
                 full_text += delta
                 await self.event_queue.put(
                     Event(
@@ -185,9 +167,35 @@ class DebateEngine:
                         },
                     )
                 )
+            elif isinstance(event, FunctionToolCallEvent):
+                args = event.part.args
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except (json.JSONDecodeError, TypeError):
+                        args = {}
+                current_query = args.get("query", "") if isinstance(args, dict) else ""
+                # Finalize current text bubble before showing search card
+                await self.event_queue.put(Event(type="debater_finalize", payload={}))
+            elif isinstance(event, FunctionToolResultEvent):
+                result_text = ""
+                if event.result and event.result.content:
+                    result_text = str(event.result.content)[:200]
+                await self.event_queue.put(Event(
+                    type="tool_call",
+                    payload={
+                        "debater_name": debater.name,
+                        "tool_name": "web_search",
+                        "query": current_query,
+                        "result_summary": result_text,
+                    },
+                ))
+            elif isinstance(event, AgentRunResultEvent):
+                result_all_messages = event.result.all_messages()
 
         # Update this debater's message history
-        self._history[debater.name] = result.all_messages()
+        if result_all_messages is not None:
+            self._history[debater.name] = result_all_messages
         self.state.history.append(Message(speaker=debater.name, content=full_text))
 
         await self.event_queue.put(
