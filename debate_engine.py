@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+from pydantic_ai import FunctionToolCallEvent, FunctionToolResultEvent
 from pydantic_ai.messages import ModelMessage
 from models import Debater
 from agents import create_debater_agent, create_judge_agent, DebaterDeps
@@ -45,8 +46,9 @@ class DebateEngine:
     SSE event emission as the engine's responsibility.
     """
 
-    def __init__(self, model: str):
+    def __init__(self, model: str, brave_api_key: str = ""):
         self.model = model
+        self.brave_api_key = brave_api_key
         self.debater_agent = create_debater_agent(model)
         self.judge_agent = create_judge_agent(model)
         self.state: Optional[DebateState] = None
@@ -111,6 +113,27 @@ class DebateEngine:
             parts.append(f"[{msg.speaker}]: {msg.content}")
         return "\n\n".join(parts)
 
+    async def _handle_events(self, ctx, event_stream, debater_name: str):
+        """Monitor agent execution, emit SSE events for tool calls."""
+        current_query = ""
+
+        async for event in event_stream:
+            if isinstance(event, FunctionToolCallEvent):
+                current_query = event.part.args.get("query", "")
+            elif isinstance(event, FunctionToolResultEvent):
+                result_text = ""
+                if event.result and event.result.content:
+                    result_text = str(event.result.content)[:200]
+                await self.event_queue.put(Event(
+                    type="tool_call",
+                    payload={
+                        "debater_name": debater_name,
+                        "tool_name": "web_search",
+                        "query": current_query,
+                        "result_summary": result_text,
+                    },
+                ))
+
     async def run_turn(self):
         """Execute a single debater's turn."""
         if not self.state or not self.state.active:
@@ -123,6 +146,7 @@ class DebateEngine:
             debater=debater,
             round_number=self.state.current_round,
             max_rounds=self.state.max_rounds,
+            brave_api_key=self.brave_api_key,
         )
 
         await self.event_queue.put(
@@ -141,6 +165,7 @@ class DebateEngine:
             user_prompt,
             deps=deps,
             message_history=self._history[debater.name],
+            event_stream_handler=lambda ctx, es: self._handle_events(ctx, es, debater.name),
         ) as result:
             async for delta in result.stream_text(delta=True):
                 full_text += delta

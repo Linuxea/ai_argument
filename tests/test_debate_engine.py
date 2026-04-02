@@ -14,6 +14,7 @@ def _make_engine(responses=None):
     # Create engine without calling __init__ to avoid creating real agents
     engine = object.__new__(DebateEngine)
     engine.model = "test:model"
+    engine.brave_api_key = ""
     engine.debater_agent = mock
     engine.judge_agent = MockDebateAgent(responses=responses or ["Judgment."])
     engine.state = None
@@ -390,3 +391,25 @@ def test_update_model_recreates_agents():
         assert engine.judge_agent is not old_judge
         mock_debater_creator.assert_called_once_with("new:model")
         mock_judge_creator.assert_called_once_with("new:model")
+
+
+@pytest.mark.asyncio
+async def test_run_turn_passes_brave_api_key_in_deps():
+    engine, mock = _make_engine(responses=["I searched and found..."])
+    engine.brave_api_key = "test-brave-key"
+
+    debater = Debater(name="Alice", personality="You are Alice.")
+    engine.state = DebateState(topic="Test topic", debaters=[debater])
+    engine._history = {"Alice": []}
+
+    await engine.run_turn()
+
+    deps = mock.last_kwargs.get("deps")
+    assert deps is not None
+    assert deps.brave_api_key == "test-brave-key"
+
+
+def test_engine_stores_brave_api_key():
+    engine, _ = _make_engine()
+    engine.brave_api_key = "my-key"
+    assert engine.brave_api_key == "my-key"

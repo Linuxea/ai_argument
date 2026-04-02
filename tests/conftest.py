@@ -35,9 +35,11 @@ class MockDebateAgent:
         self.responses = responses or ["This is a mock response."]
         self.call_count = 0
         self.last_user_prompt = None
+        self.last_kwargs = None
 
     def run_stream(self, user_prompt: str, **kwargs):
         self.last_user_prompt = user_prompt
+        self.last_kwargs = kwargs
         response = self.responses[self.call_count % len(self.responses)]
         self.call_count += 1
         return MockStreamResult(response)

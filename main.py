@@ -20,7 +20,7 @@ custom_debaters: list[Debater] = []
 async def lifespan(app: FastAPI):
     global debate_engine
     model = build_model_string(settings.api_base_url, settings.model)
-    debate_engine = DebateEngine(model=model)
+    debate_engine = DebateEngine(model=model, brave_api_key=settings.brave_api_key)
     yield
 
 
