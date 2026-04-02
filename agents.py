@@ -70,9 +70,14 @@ class DebaterDeps:
     brave_api_key: str | None = None
 
 
-def create_debater_agent(model: str) -> Agent[DebaterDeps, str]:
+def create_debater_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[DebaterDeps, str]:
     """Create a PydanticAI Agent configured for debate participants."""
     from tools import web_search
+    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(base_url=base_url, api_key=api_key)
+    model = OpenAIModel(model_name, provider=provider)
 
     agent: Agent[DebaterDeps, str] = Agent(
         model,
@@ -115,8 +120,14 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-def create_judge_agent(model: str) -> Agent[None, str]:
+def create_judge_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[None, str]:
     """Create a PydanticAI Agent configured for debate judging."""
+    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(base_url=base_url, api_key=api_key)
+    model = OpenAIModel(model_name, provider=provider)
+
     agent: Agent[None, str] = Agent(
         model,
         output_type=str,

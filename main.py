@@ -19,8 +19,12 @@ custom_debaters: list[Debater] = []
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global debate_engine
-    model = build_model_string(settings.api_base_url, settings.model)
-    debate_engine = DebateEngine(model=model, brave_api_key=settings.brave_api_key)
+    debate_engine = DebateEngine(
+        model=settings.model,
+        base_url=settings.api_base_url,
+        api_key=settings.api_key,
+        brave_api_key=settings.brave_api_key,
+    )
     yield
 
 
@@ -169,8 +173,11 @@ async def update_settings(api_settings: ApiSettings):
     if api_settings.model_name:
         settings.model = api_settings.model_name
 
-    model = build_model_string(settings.api_base_url, settings.model)
-    debate_engine.update_model(model)
+    debate_engine.update_model(
+        model_name=settings.model,
+        base_url=settings.api_base_url,
+        api_key=settings.api_key,
+    )
 
     return {"status": "updated"}
 

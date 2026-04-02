@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic_ai import AgentRunResultEvent, FunctionToolCallEvent, FunctionToolResultEvent
-from pydantic_ai.messages import ModelMessage, PartDeltaEvent, TextPartDelta
+from pydantic_ai.messages import ModelMessage, PartStartEvent, PartDeltaEvent, TextPart, TextPartDelta
 from models import Debater
 from agents import create_debater_agent, create_judge_agent, DebaterDeps
 
@@ -47,11 +47,13 @@ class DebateEngine:
     SSE event emission as the engine's responsibility.
     """
 
-    def __init__(self, model: str, brave_api_key: str = ""):
+    def __init__(self, model: str, brave_api_key: str = "", base_url: str | None = None, api_key: str | None = None):
         self.model = model
+        self.base_url = base_url
+        self.api_key = api_key
         self.brave_api_key = brave_api_key
-        self.debater_agent = create_debater_agent(model)
-        self.judge_agent = create_judge_agent(model)
+        self.debater_agent = create_debater_agent(model, base_url, api_key)
+        self.judge_agent = create_judge_agent(model, base_url, api_key)
         self.state: Optional[DebateState] = None
         self.event_queue: asyncio.Queue = asyncio.Queue()
         self._loop_task: Optional[asyncio.Task] = None
@@ -155,7 +157,21 @@ class DebateEngine:
             deps=deps,
             message_history=self._history[debater.name],
         ):
-            if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+            # Handle PartStartEvent - contains initial content (e.g., "[[" at the start)
+            if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                initial_content = event.part.content
+                if initial_content:
+                    full_text += initial_content
+                    await self.event_queue.put(
+                        Event(
+                            type="debater_chunk",
+                            payload={
+                                "debater_name": debater.name,
+                                "text_chunk": initial_content,
+                            },
+                        )
+                    )
+            elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
                 delta = event.delta.content_delta
                 full_text += delta
                 await self.event_queue.put(
@@ -300,8 +316,10 @@ class DebateEngine:
         )
         return True
 
-    def update_model(self, model: str):
+    def update_model(self, model_name: str, base_url: str | None = None, api_key: str | None = None):
         """Recreate agents when API settings change."""
-        self.model = model
-        self.debater_agent = create_debater_agent(model)
-        self.judge_agent = create_judge_agent(model)
+        self.model = model_name
+        self.base_url = base_url
+        self.api_key = api_key
+        self.debater_agent = create_debater_agent(model_name, base_url, api_key)
+        self.judge_agent = create_judge_agent(model_name, base_url, api_key)
