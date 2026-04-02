@@ -52,6 +52,70 @@
     --radius-lg:     16px;
 }
 
+/* ─── Dark Theme ──────────────────────────────────── */
+
+html.dark {
+    --bg-base:       #121217;
+    --bg-surface:    #1a1a23;
+    --bg-elevated:   #24242f;
+    --bg-card:       #2a2a37;
+    --bg-input:      #1e1e2a;
+
+    --border:        #2e2e3e;
+    --border-hover:  #44445a;
+    --shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.25);
+    --shadow-md:     0 2px 10px rgba(0, 0, 0, 0.35);
+    --shadow-lg:     0 4px 20px rgba(0, 0, 0, 0.40);
+
+    --ink:           #e4e0d8;
+    --ink-soft:      #b0aaa0;
+    --ink-muted:     #706a60;
+    --terracotta:    #e06850;
+    --terracotta-dim:#c85540;
+    --terracotta-glow: rgba(224, 104, 80, 0.18);
+    --teal:          #40b8a8;
+    --teal-dim:      #35988a;
+    --teal-glow:     rgba(64, 184, 168, 0.14);
+    --navy:          #7a94ae;
+
+    --text:          #e4e0d8;
+    --text-soft:     #b0aaa0;
+    --text-muted:    #706a60;
+}
+
+html.dark .message.user .message-content {
+    background: linear-gradient(135deg, rgba(122, 148, 174, 0.12), var(--bg-elevated));
+}
+
+html.dark .chat-area::before {
+    background:
+        radial-gradient(ellipse 60% 40% at 50% 0%, rgba(224, 104, 80, 0.05), transparent),
+        radial-gradient(ellipse 50% 50% at 70% 100%, rgba(64, 184, 168, 0.04), transparent);
+}
+
+html.dark #download-btn:hover:not(:disabled) {
+    background: rgba(122, 148, 174, 0.10);
+}
+
+/* ─── Theme Toggle ─────────────────────────────────── */
+
+.theme-toggle {
+    background: none;
+    border: none;
+    font-size: 1.15rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    transition: color 0.2s, background 0.2s;
+    line-height: 1;
+}
+
+.theme-toggle:hover {
+    color: var(--text);
+    background: var(--bg-input);
+}
+
 /* ─── Base ─────────────────────────────────────────── */
 
 body {
@@ -93,8 +157,6 @@ body {
     color: var(--ink);
     text-align: center;
     letter-spacing: 0.04em;
-    padding-bottom: 18px;
-    border-bottom: 2px solid var(--terracotta);
 }
 
 .sidebar-section {

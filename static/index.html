@@ -8,13 +8,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=7">
+    <link rel="stylesheet" href="/static/style.css?v=8">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="app">
         <aside class="sidebar">
-            <h1>AI 辩论</h1>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:18px;border-bottom:2px solid var(--terracotta)">
+                <h1 style="border:none;padding:0">AI 辩论</h1>
+                <button class="theme-toggle" id="theme-toggle" title="切换主题">🌙</button>
+            </div>
 
             <section class="sidebar-section">
                 <label for="topic-input">辩论主题</label>
@@ -79,6 +82,6 @@
         </main>
     </div>
 
-    <script src="/static/app.js?v=8"></script>
+    <script src="/static/app.js?v=9"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ class DebateApp {
     }
 
     async init() {
+        this.initTheme();
         this.bindElements();
         this.bindEventListeners();
         this.loadSettings();
@@ -48,6 +49,9 @@ class DebateApp {
         this.sendBtn = document.getElementById('send-btn');
         this.judgeBtn = document.getElementById('judge-btn');
         this.downloadBtn = document.getElementById('download-btn');
+
+        // Theme
+        this.themeToggle = document.getElementById('theme-toggle');
     }
 
     bindEventListeners() {
@@ -73,6 +77,9 @@ class DebateApp {
 
         // Download
         this.downloadBtn.addEventListener('click', () => this.downloadChat());
+
+        // Theme
+        this.themeToggle.addEventListener('click', () => this.toggleTheme());
     }
 
     async loadDebaters() {
@@ -489,6 +496,8 @@ class DebateApp {
             return;
         }
 
+        const isDark = document.documentElement.classList.contains('dark');
+
         let body = '';
         msgEls.forEach(el => {
             if (el.classList.contains('system')) {
@@ -509,20 +518,27 @@ class DebateApp {
             }
         });
 
+        const bg = isDark ? '#121217' : '#f5f1ea';
+        const fg = isDark ? '#e4e0d8' : '#1a1714';
+        const msgBg = isDark ? '#24242f' : '#fff';
+        const userBg = isDark ? 'linear-gradient(135deg,rgba(122,148,174,.12),#24242f)' : 'linear-gradient(135deg,rgba(45,62,80,.07),#fff)';
+        const border = isDark ? '#2e2e3e' : '#ddd7cc';
+        const muted = isDark ? '#706a60' : '#9a9183';
+
         const html = `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><title>${this.escapeHtml(topic)}</title>
 <style>
-  body{font-family:'Outfit',system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;background:#f5f1ea;color:#1a1714;line-height:1.7}
+  body{font-family:'Outfit',system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;background:${bg};color:${fg};line-height:1.7}
   h1{font-family:'Playfair Display',Georgia,serif;font-size:1.4rem;text-align:center;padding-bottom:16px;border-bottom:2px solid #c0503a;margin-bottom:28px}
   .debater-msg,.user-msg{margin-bottom:22px}
   .msg-header{font-size:.82rem;margin-bottom:4px}
   .msg-header .avatar{font-size:1rem}
   .msg-header .sender{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:.78rem;letter-spacing:.04em}
-  .msg-header .time{color:#9a9183;font-size:.72rem;margin-left:6px}
-  .msg-body{background:#fff;padding:14px 18px;border-radius:12px;border-left:3px solid #c0503a;box-shadow:0 1px 3px rgba(80,65,40,.06);font-size:.93rem}
-  .user-msg .msg-body{border-left-color:#2d3e50;background:linear-gradient(135deg,rgba(45,62,80,.07),#fff)}
-  .sys-msg{text-align:center;color:#9a9183;font-style:italic;font-size:.84rem;margin:12px 0}
-  .sys-msg::before,.sys-msg::after{content:' — ';color:#ddd7cc}
+  .msg-header .time{color:${muted};font-size:.72rem;margin-left:6px}
+  .msg-body{background:${msgBg};padding:14px 18px;border-radius:12px;border-left:3px solid #c0503a;box-shadow:0 1px 3px rgba(80,65,40,.06);font-size:.93rem}
+  .user-msg .msg-body{border-left-color:#2d3e50;background:${userBg}}
+  .sys-msg{text-align:center;color:${muted};font-style:italic;font-size:.84rem;margin:12px 0}
+  .sys-msg::before,.sys-msg::after{content:' — ';color:${border}}
 </style></head><body>
 <h1>${this.escapeHtml(topic)}</h1>
 ${body}
@@ -629,6 +645,24 @@ ${body}
                 this.downloadBtn.disabled = false;
                 break;
         }
+    }
+
+    initTheme() {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const dark = stored === 'dark' || (!stored && prefersDark);
+        if (dark) document.documentElement.classList.add('dark');
+        this._updateThemeIcon(dark);
+    }
+
+    toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        this._updateThemeIcon(isDark);
+    }
+
+    _updateThemeIcon(isDark) {
+        if (this.themeToggle) this.themeToggle.textContent = isDark ? '☀️' : '🌙';
     }
 
     async loadSettings() {
