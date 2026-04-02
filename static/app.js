@@ -340,14 +340,14 @@ class DebateApp {
 
     createMessage(name, color, avatar, type = 'debater') {
         const message = document.createElement('div');
-        message.className = 'message ai';
+        const isConsecutive = (this._lastSpeakerName === name);
+        message.className = isConsecutive ? 'message ai continuation' : 'message ai';
         message.dataset.speaker = name;
 
         const time = new Date().toLocaleTimeString();
-        const isConsecutive = (this._lastSpeakerName === name);
 
         const header = document.createElement('div');
-        header.className = isConsecutive ? 'message-header minimal' : 'message-header';
+        header.className = 'message-header';
 
         if (!isConsecutive) {
             const avatarEl = document.createElement('span');
@@ -435,13 +435,12 @@ class DebateApp {
 
     addToolCard(debaterName, query, resultSummary) {
         const message = document.createElement('div');
-        message.className = 'message ai tool-card';
+        const isConsecutive = (this._lastSpeakerName === debaterName);
+        message.className = isConsecutive ? 'message ai tool-card continuation' : 'message ai tool-card';
         message.dataset.speaker = debaterName;
 
-        const isConsecutive = (this._lastSpeakerName === debaterName);
-
         const header = document.createElement('div');
-        header.className = isConsecutive ? 'message-header minimal' : 'message-header';
+        header.className = 'message-header';
 
         if (!isConsecutive) {
             const avatarEl = document.createElement('span');
