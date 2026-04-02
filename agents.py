@@ -17,6 +17,9 @@ You are a participant in a multi-party debate. Follow these rules:
 - Don't repeat yourself. Push the discussion forward each round.
 - When rebutting opponents, do not just deny their claims - use each rebuttal as a stepping stone to deepen and advance your own argument. Build upward, don't spin in circles.
 - Express yourself naturally, like a real debater would. Do NOT use headers, labels, or numbered sections in your speech. No "Rebuttal:", "Argument:", "Evidence:" or similar formatting. Just speak.
+"""
+
+SEARCH_INSTRUCTIONS = """\
 
 ## Web Search Tool
 
@@ -70,21 +73,36 @@ class DebaterDeps:
     brave_api_key: str | None = None
 
 
-def create_debater_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[DebaterDeps, str]:
-    """Create a PydanticAI Agent configured for debate participants."""
-    from tools import web_search
+def _make_model(model_name: str, base_url: str | None = None, api_key: str | None = None):
     from pydantic_ai.models.openai import OpenAIModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
     provider = OpenAIProvider(base_url=base_url, api_key=api_key)
-    model = OpenAIModel(model_name, provider=provider)
+    return OpenAIModel(model_name, provider=provider)
+
+
+def create_debater_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[DebaterDeps, str]:
+    """Create a PydanticAI Agent with web search capability."""
+    from tools import web_search
 
     agent: Agent[DebaterDeps, str] = Agent(
-        model,
+        _make_model(model_name, base_url, api_key),
         deps_type=DebaterDeps,
         output_type=str,
         instructions=_build_debater_instructions,
         tools=[web_search],
+    )
+    return agent
+
+
+def create_debater_agent_no_search(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[DebaterDeps, str]:
+    """Create a PydanticAI Agent without web search."""
+    agent: Agent[DebaterDeps, str] = Agent(
+        _make_model(model_name, base_url, api_key),
+        deps_type=DebaterDeps,
+        output_type=str,
+        instructions=_build_debater_instructions,
+        tools=[],
     )
     return agent
 
@@ -99,6 +117,9 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
         f"Your stance: {stance}",
         debater.personality,
     ]
+
+    if debater.enable_search:
+        parts.append(SEARCH_INSTRUCTIONS)
 
     if ctx.deps.max_rounds:
         current = ctx.deps.round_number + 1

@@ -8,6 +8,7 @@ class Debater(BaseModel):
     avatar: str = "💬"
     stance: Literal["for", "against", "neutral"] = "neutral"
     personality: str
+    enable_search: bool = True
 
     @field_validator("color")
     @classmethod
@@ -40,3 +41,4 @@ class CustomDebaterRequest(BaseModel):
     avatar: str = "💬"
     stance: Literal["for", "against", "neutral"] = "neutral"
     personality: str
+    enable_search: bool = True

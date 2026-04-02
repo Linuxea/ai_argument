@@ -7,7 +7,7 @@ from typing import Optional
 from pydantic_ai import AgentRunResultEvent, FunctionToolCallEvent, FunctionToolResultEvent
 from pydantic_ai.messages import ModelMessage, PartStartEvent, PartDeltaEvent, TextPart, TextPartDelta
 from models import Debater
-from agents import create_debater_agent, create_judge_agent, DebaterDeps
+from agents import create_debater_agent, create_debater_agent_no_search, create_judge_agent, DebaterDeps
 
 
 @dataclass
@@ -53,11 +53,12 @@ class DebateEngine:
         self.api_key = api_key
         self.brave_api_key = brave_api_key
         self.debater_agent = create_debater_agent(model, base_url, api_key)
+        self.debater_agent_no_search = create_debater_agent_no_search(model, base_url, api_key)
         self.judge_agent = create_judge_agent(model, base_url, api_key)
         self.state: Optional[DebateState] = None
         self.event_queue: asyncio.Queue = asyncio.Queue()
         self._loop_task: Optional[asyncio.Task] = None
-        # Per-debater PydanticAI message history
+        # Per-debater PydanticAI message history (keyed by debater name)
         self._history: dict[str, list[ModelMessage]] = {}
 
     def start(self, topic: str, debaters: list[Debater], max_rounds: Optional[int] = None):
@@ -152,7 +153,9 @@ class DebateEngine:
         current_query = ""
         result_all_messages = None
 
-        async for event in self.debater_agent.run_stream_events(
+        agent = self.debater_agent if debater.enable_search else self.debater_agent_no_search
+
+        async for event in agent.run_stream_events(
             user_prompt,
             deps=deps,
             message_history=self._history[debater.name],
@@ -322,4 +325,5 @@ class DebateEngine:
         self.base_url = base_url
         self.api_key = api_key
         self.debater_agent = create_debater_agent(model_name, base_url, api_key)
+        self.debater_agent_no_search = create_debater_agent_no_search(model_name, base_url, api_key)
         self.judge_agent = create_judge_agent(model_name, base_url, api_key)
