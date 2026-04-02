@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 
-from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, ApiSettings
+from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, ApiSettings, RefineTopicRequest
 from config import load_presets, settings, build_model_string
 from debate_engine import DebateEngine
 
@@ -214,3 +214,44 @@ async def create_debater(request: CustomDebaterRequest):
     )
     custom_debaters.append(debater)
     return {"status": "created", "debater": debater.model_dump()}
+
+
+@app.post("/api/topic/refine")
+async def refine_topic(request: RefineTopicRequest):
+    """Use AI to refine and clarify a debate topic."""
+    if not settings.api_key:
+        raise HTTPException(status_code=400, detail="请先在设置中配置 API Key")
+
+    if not request.topic or not request.topic.strip():
+        raise HTTPException(status_code=400, detail="话题不能为空")
+
+    prompt = f"""请将以下辩论话题优化为更清晰、更有辩论价值的表述。
+
+原始话题: {request.topic}
+
+要求:
+1. 保持原始话题的核心立场和意图
+2. 使表述更加明确、具体
+3. 确保话题具有可辩性（存在不同观点）
+4. 直接输出优化后的话题，不要添加任何解释或前缀
+
+优化后的话题:"""
+
+    try:
+        client = AsyncOpenAI(base_url=settings.api_base_url, api_key=settings.api_key)
+        response = await client.chat.completions.create(
+            model=settings.model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+            temperature=0.7,
+        )
+        refined_topic = response.choices[0].message.content.strip()
+        return {"refined_topic": refined_topic}
+    except Exception as e:
+        error_msg = str(e)
+        if "401" in error_msg or "authentication" in error_msg.lower():
+            raise HTTPException(status_code=401, detail="API Key 无效")
+        elif "404" in error_msg:
+            raise HTTPException(status_code=404, detail="模型不存在或 API URL 不正确")
+        else:
+            raise HTTPException(status_code=502, detail=f"话题优化失败: {error_msg}")

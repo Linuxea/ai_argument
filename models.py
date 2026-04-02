@@ -42,3 +42,7 @@ class CustomDebaterRequest(BaseModel):
     stance: Literal["for", "against", "neutral"] = "neutral"
     personality: str
     enable_search: bool = True
+
+
+class RefineTopicRequest(BaseModel):
+    topic: str

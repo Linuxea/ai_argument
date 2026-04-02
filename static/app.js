@@ -23,6 +23,7 @@ class DebateApp {
         // Topic input
         this.topicInput = document.getElementById('topic-input');
         this.maxRoundsInput = document.getElementById('max-rounds');
+        this.refineTopicBtn = document.getElementById('refine-topic-btn');
 
         // Debater list
         this.debaterList = document.getElementById('debater-list');
@@ -79,6 +80,9 @@ class DebateApp {
         this.startBtn.addEventListener('click', () => this.startDebate());
         this.stopBtn.addEventListener('click', () => this.stopDebate());
         this.resumeBtn.addEventListener('click', () => this.resumeDebate());
+
+        // Topic refinement
+        this.refineTopicBtn.addEventListener('click', () => this.refineTopic());
 
         // API settings - auto-save and auto-fetch models with debounce
         this.apiUrl.addEventListener('input', () => this.onApiInputChanged());
@@ -209,6 +213,53 @@ class DebateApp {
                 this._clearDragOver();
             });
         });
+    }
+
+    async refineTopic() {
+        const topic = this.topicInput.value.trim();
+        if (!topic) {
+            alert('请先输入辩论主题');
+            return;
+        }
+
+        // Show loading state
+        const originalText = this.refineTopicBtn.textContent;
+        this.refineTopicBtn.disabled = true;
+        this.refineTopicBtn.textContent = '优化中...';
+
+        try {
+            // Ensure API settings are synced
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_url: this.apiUrl.value,
+                    api_key: this.apiKey.value,
+                    model_name: this.modelName.value
+                })
+            });
+
+            const response = await fetch('/api/topic/refine', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || '话题优化失败');
+            }
+
+            const data = await response.json();
+            this.topicInput.value = data.refined_topic;
+
+        } catch (error) {
+            console.error('Failed to refine topic:', error);
+            alert(error.message);
+        } finally {
+            this.refineTopicBtn.disabled = false;
+            this.refineTopicBtn.textContent = originalText;
+        }
     }
 
     async startDebate() {

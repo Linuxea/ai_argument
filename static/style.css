@@ -678,6 +678,31 @@ input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: none; }
     height: 30px;
 }
 
+.refine-btn {
+    margin-left: auto;
+    padding: 6px 12px;
+    background: var(--gold-glow);
+    border: 1px solid var(--gold-dim);
+    border-radius: var(--radius-sm);
+    color: var(--gold-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.refine-btn:hover:not(:disabled) {
+    background: var(--gold);
+    color: #fff;
+    border-color: var(--gold);
+}
+
+.refine-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* ═══════════════════════════════════════════════════════
    SETTINGS PANEL
    ═══════════════════════════════════════════════════════ */
