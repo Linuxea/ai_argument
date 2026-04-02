@@ -4,6 +4,9 @@ class DebateApp {
         this.currentMessageEl = null;
         this.debateActive = false;
         this.debatePaused = false;
+        this._currentDebaterName = null;
+        this._currentDebaterColor = null;
+        this._currentDebaterAvatar = null;
         this.init();
     }
 
@@ -256,6 +259,9 @@ class DebateApp {
 
         this.eventSource.addEventListener('debater_start', (e) => {
             const data = JSON.parse(e.data);
+            this._currentDebaterName = data.debater_name;
+            this._currentDebaterColor = data.color;
+            this._currentDebaterAvatar = data.avatar;
             this.createMessage(data.debater_name, data.color, data.avatar, 'debater');
         });
 
@@ -267,6 +273,14 @@ class DebateApp {
         this.eventSource.addEventListener('debater_end', (e) => {
             const data = JSON.parse(e.data);
             this.finalizeMessage();
+        });
+
+        this.eventSource.addEventListener('tool_call', (e) => {
+            const data = JSON.parse(e.data);
+            // Finalize current text bubble (if any)
+            this.finalizeMessage();
+            // Render search card
+            this.addToolCard(data.debater_name, data.query, data.result_summary);
         });
 
         this.eventSource.addEventListener('round_end', (e) => {
@@ -358,11 +372,20 @@ class DebateApp {
     }
 
     appendToMessage(text) {
-        if (this.currentMessageEl) {
-            const raw = (this.currentMessageEl.dataset.raw || '') + text;
-            this.currentMessageEl.dataset.raw = raw;
-            this.currentMessageEl.innerHTML = this.renderContent(raw);
+        if (!this.currentMessageEl) {
+            // No active bubble — create one for the same debater
+            // (happens after a tool_call event finalized the previous bubble)
+            this.createMessage(
+                this._currentDebaterName || 'Unknown',
+                this._currentDebaterColor || '#333333',
+                this._currentDebaterAvatar || '💬',
+                'debater'
+            );
         }
+        const raw = (this.currentMessageEl.dataset.raw || '') + text;
+        this.currentMessageEl.dataset.raw = raw;
+        this.currentMessageEl.innerHTML = this.renderContent(raw);
+        this.scrollToBottom();
     }
 
     finalizeMessage() {
@@ -401,6 +424,50 @@ class DebateApp {
         `;
 
         this.messages.appendChild(message);
+    }
+
+    addToolCard(debaterName, query, resultSummary) {
+        const message = document.createElement('div');
+        message.className = 'message ai tool-card';
+
+        const header = document.createElement('div');
+        header.className = 'message-header';
+
+        const avatarEl = document.createElement('span');
+        avatarEl.className = 'message-avatar';
+        avatarEl.textContent = this._currentDebaterAvatar || '🔍';
+
+        const senderEl = document.createElement('span');
+        senderEl.className = 'message-sender';
+        senderEl.style.color = this.sanitizeColor(this._currentDebaterColor || '#333333');
+        senderEl.textContent = debaterName;
+
+        const timeEl = document.createElement('span');
+        timeEl.className = 'message-time';
+        timeEl.textContent = new Date().toLocaleTimeString();
+
+        header.appendChild(avatarEl);
+        header.appendChild(senderEl);
+        header.appendChild(timeEl);
+
+        const content = document.createElement('div');
+        content.className = 'tool-card-content';
+
+        const label = document.createElement('div');
+        label.className = 'tool-card-label';
+        label.textContent = '🔍 Searched: ' + query;
+
+        const results = document.createElement('div');
+        results.className = 'tool-card-results';
+        results.innerHTML = this.renderContent(resultSummary || '');
+
+        content.appendChild(label);
+        content.appendChild(results);
+
+        message.appendChild(header);
+        message.appendChild(content);
+        this.messages.appendChild(message);
+        this.scrollToBottom();
     }
 
     escapeHtml(text) {
