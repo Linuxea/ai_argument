@@ -53,11 +53,14 @@ class DebaterDeps:
 
 def create_debater_agent(model: str) -> Agent[DebaterDeps, str]:
     """Create a PydanticAI Agent configured for debate participants."""
+    from tools import web_search
+
     agent: Agent[DebaterDeps, str] = Agent(
         model,
         deps_type=DebaterDeps,
         output_type=str,
         instructions=_build_debater_instructions,
+        tools=[web_search],
     )
     return agent
 

@@ -115,3 +115,15 @@ def test_debater_deps_brave_api_key_defaults_none():
         max_rounds=5,
     )
     assert deps.brave_api_key is None
+
+
+def test_debater_agent_has_web_search_tool():
+    agent = create_debater_agent("deepseek:deepseek-chat")
+    tool_names = list(agent._function_toolset.tools.keys())
+    assert "web_search" in tool_names
+
+
+def test_judge_agent_has_no_web_search_tool():
+    agent = create_judge_agent("deepseek:deepseek-chat")
+    tool_names = list(agent._function_toolset.tools.keys())
+    assert "web_search" not in tool_names
