@@ -48,6 +48,7 @@ class DebaterDeps:
     debater: Debater
     round_number: int
     max_rounds: int | None
+    brave_api_key: str | None = None
 
 
 def create_debater_agent(model: str) -> Agent[DebaterDeps, str]:

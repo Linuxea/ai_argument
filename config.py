@@ -26,6 +26,7 @@ class Settings:
         self.api_base_url = api_base_url
         self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
         self.model = model
+        self.brave_api_key = os.environ.get("BRAVE_API_KEY", "")
 
 
 def build_model_string(base_url: str, model: str) -> str:

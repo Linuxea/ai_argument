@@ -92,3 +92,26 @@ def test_debater_deps_dataclass():
     assert deps.debater.name == "Test"
     assert deps.round_number == 1
     assert deps.max_rounds == 5
+
+
+def test_debater_deps_with_brave_api_key():
+    debater = Debater(name="Test", personality="Test.")
+    deps = DebaterDeps(
+        topic="AI ethics",
+        debater=debater,
+        round_number=1,
+        max_rounds=5,
+        brave_api_key="test-key-123",
+    )
+    assert deps.brave_api_key == "test-key-123"
+
+
+def test_debater_deps_brave_api_key_defaults_none():
+    debater = Debater(name="Test", personality="Test.")
+    deps = DebaterDeps(
+        topic="AI ethics",
+        debater=debater,
+        round_number=1,
+        max_rounds=5,
+    )
+    assert deps.brave_api_key is None
