@@ -747,3 +747,38 @@ button:disabled {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.4; }
 }
+
+/* ─── Tool Call Cards ──────────────────────────────── */
+
+.tool-card .tool-card-content {
+    background: var(--bg-input);
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border);
+    line-height: 1.5;
+    word-wrap: break-word;
+    font-size: 0.82rem;
+    color: var(--text-soft);
+}
+
+.tool-card .tool-card-label {
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.tool-card .tool-card-results {
+    font-size: 0.82rem;
+    color: var(--text-soft);
+}
+
+.tool-card .tool-card-results p {
+    margin: 0;
+}
+
+.tool-card .tool-card-results ul,
+.tool-card .tool-card-results ol {
+    padding-left: 18px;
+    margin: 4px 0;
+}
