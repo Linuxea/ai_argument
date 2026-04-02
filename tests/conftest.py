@@ -1,9 +1,11 @@
-# tests/conftest.py
 import pytest
-from pydantic_ai.messages import ModelMessage
+from unittest.mock import MagicMock
+
+from pydantic_ai import AgentRunResultEvent
+from pydantic_ai.messages import ModelMessage, PartDeltaEvent, TextPartDelta
 
 
-class MockStreamResult:
+class _MockRunStreamResult:
     """Mimics the async context manager returned by Agent.run_stream()."""
 
     def __init__(self, text: str):
@@ -17,15 +19,33 @@ class MockStreamResult:
         pass
 
     async def stream_text(self, delta=True):
-        words = self._text.split()
-        for i, word in enumerate(words):
-            if delta:
+        if delta:
+            words = self._text.split()
+            for i, word in enumerate(words):
                 yield word if i == 0 else " " + word
-            else:
-                yield " ".join(words[: i + 1])
+        else:
+            yield self._text
 
     def all_messages(self) -> list[ModelMessage]:
         return self._messages
+
+
+class _MockStreamEvents:
+    """Mimics the async iterable returned by Agent.run_stream_events()."""
+
+    def __init__(self, text: str):
+        self._text = text
+        self._messages: list[ModelMessage] = []
+
+    async def __aiter__(self):
+        words = self._text.split()
+        for i, word in enumerate(words):
+            delta = word if i == 0 else " " + word
+            yield PartDeltaEvent(index=0, delta=TextPartDelta(content_delta=delta))
+
+        result = MagicMock()
+        result.all_messages.return_value = self._messages
+        yield AgentRunResultEvent(result=result)
 
 
 class MockDebateAgent:
@@ -37,12 +57,20 @@ class MockDebateAgent:
         self.last_user_prompt = None
         self.last_kwargs = None
 
-    def run_stream(self, user_prompt: str, **kwargs):
+    def run_stream_events(self, user_prompt: str, **kwargs):
         self.last_user_prompt = user_prompt
         self.last_kwargs = kwargs
         response = self.responses[self.call_count % len(self.responses)]
         self.call_count += 1
-        return MockStreamResult(response)
+        return _MockStreamEvents(response)
+
+    def run_stream(self, user_prompt: str, **kwargs):
+        """For judge agent which still uses run_stream()."""
+        self.last_user_prompt = user_prompt
+        self.last_kwargs = kwargs
+        response = self.responses[self.call_count % len(self.responses)]
+        self.call_count += 1
+        return _MockRunStreamResult(response)
 
 
 @pytest.fixture
