@@ -28,5 +28,17 @@ class Settings:
         self.model = model
 
 
+def build_model_string(base_url: str, model: str) -> str:
+    """Convert API settings to a PydanticAI model string."""
+    KNOWN_PROVIDERS = {
+        "api.deepseek.com": "deepseek",
+        "api.openai.com": "openai",
+    }
+    for host, provider in KNOWN_PROVIDERS.items():
+        if host in base_url:
+            return f"{provider}:{model}"
+    return f"openai:{model}"
+
+
 # Global settings instance
 settings = Settings()
