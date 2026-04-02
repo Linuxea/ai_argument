@@ -7,7 +7,7 @@
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Source+Sans+Pro:wght@300;400;600;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css?v=10">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -67,6 +67,20 @@
             </header>
 
             <div id="messages" class="messages"></div>
+
+            <!-- Search Tool Button (Fixed Position) -->
+            <button class="search-toggle-btn" id="search-toggle-btn" title="搜索消息">🔍</button>
+
+            <!-- Search Drawer -->
+            <div class="search-backdrop" id="search-backdrop"></div>
+            <div class="search-drawer" id="search-drawer">
+                <div class="search-drawer-header">
+                    <h3>搜索消息</h3>
+                    <button class="icon-btn" id="search-close" title="关闭">✕</button>
+                </div>
+                <input type="text" id="search-input" placeholder="输入关键词搜索...">
+                <div id="search-results" class="search-results"></div>
+            </div>
 
             <div class="input-bar">
                 <input type="text" id="user-input" placeholder="参与讨论..." disabled>
