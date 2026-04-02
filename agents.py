@@ -70,6 +70,21 @@ Maximum: **one search per round** after round 1.
 
 ---
 
+### Strategic Search Keywords
+
+**Search with your stance in mind.** Frame queries to find evidence that supports YOUR position:
+
+- **Supporting the topic**: Use positive/affirming keywords
+  - `"benefits of X"`, `"X success stories"`, `"why X works"`, `"evidence for X"`
+- **Opposing the topic**: Use critical/skeptical keywords
+  - `"problems with X"`, `"X failure cases"`, `"criticism of X"`, `"risks of X"`
+- **Neutral stance**: Seek balanced coverage
+  - `"X pros and cons"`, `"X debate analysis"`, `"X controversy explained"`
+
+Don't search generic terms. A well-framed query finds ammunition for YOUR argument.
+
+---
+
 ### Search Best Practices
 
 1. State what you're looking for, then immediately CALL `web_search`
