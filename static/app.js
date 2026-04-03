@@ -500,17 +500,29 @@ class DebateApp {
 
         // Create thinking elements on first call
         if (!this.currentMessageEl.querySelector('.thinking-text')) {
-            const tag = document.createElement('span');
-            tag.className = 'thinking-tag';
-            tag.textContent = '💭 thinking';
+            // Create clickable header (like tool-card)
+            const header = document.createElement('div');
+            header.className = 'thinking-header';
+            header.style.cursor = 'pointer';
 
-            const thinkingSpan = document.createElement('span');
+            const toggle = document.createElement('span');
+            toggle.className = 'thinking-toggle';
+            toggle.textContent = '▼';  // Expanded during streaming
+
+            const label = document.createElement('span');
+            label.className = 'thinking-label';
+            label.textContent = ' 💭 thinking...';
+
+            header.appendChild(toggle);
+            header.appendChild(label);
+
+            const thinkingSpan = document.createElement('div');
             thinkingSpan.className = 'thinking-text';
 
-            const divider = document.createElement('span');
+            const divider = document.createElement('div');
             divider.className = 'thinking-divider';
 
-            this.currentMessageEl.appendChild(tag);
+            this.currentMessageEl.appendChild(header);
             this.currentMessageEl.appendChild(thinkingSpan);
             this.currentMessageEl.appendChild(divider);
         }
@@ -524,7 +536,7 @@ class DebateApp {
     finalizeMessage() {
         if (this.currentMessageEl) {
             // Preserve thinking elements before re-rendering
-            const thinkingTag = this.currentMessageEl.querySelector('.thinking-tag');
+            const thinkingHeader = this.currentMessageEl.querySelector('.thinking-header');
             const thinkingText = this.currentMessageEl.querySelector('.thinking-text');
             const thinkingDivider = this.currentMessageEl.querySelector('.thinking-divider');
             const hasThinking = thinkingText && thinkingText.textContent.trim();
@@ -534,9 +546,20 @@ class DebateApp {
 
             // Re-attach thinking elements if they existed and had content
             if (hasThinking) {
+                // Collapse the thinking content
+                thinkingText.classList.add('thinking-collapsed');
+                thinkingHeader.querySelector('.thinking-toggle').textContent = '▶';
+                thinkingHeader.querySelector('.thinking-label').textContent = ' 💭 thinking';
+
+                // Add click handler for toggle
+                thinkingHeader.onclick = () => {
+                    const collapsed = thinkingText.classList.toggle('thinking-collapsed');
+                    thinkingHeader.querySelector('.thinking-toggle').textContent = collapsed ? '▶' : '▼';
+                };
+
                 this.currentMessageEl.prepend(thinkingDivider);
                 this.currentMessageEl.prepend(thinkingText);
-                this.currentMessageEl.prepend(thinkingTag);
+                this.currentMessageEl.prepend(thinkingHeader);
             }
         }
         this.currentMessageEl = null;
