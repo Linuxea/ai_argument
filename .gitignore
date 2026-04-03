@@ -45,3 +45,4 @@ config.local.py
 
 # Worktrees
 .worktrees/
+.superpowers/
