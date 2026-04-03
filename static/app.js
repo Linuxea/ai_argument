@@ -332,6 +332,12 @@ class DebateApp {
             this.createMessage(data.debater_name, data.color, data.avatar, 'debater');
         });
 
+        this.eventSource.addEventListener('thinking_chunk', (e) => {
+            const data = this._parseSSEData(e, 'thinking_chunk');
+            if (!data) return;
+            this.appendToThinking(data.text_chunk);
+        });
+
         this.eventSource.addEventListener('debater_chunk', (e) => {
             const data = this._parseSSEData(e, 'debater_chunk');
             if (!data) return;
@@ -478,6 +484,40 @@ class DebateApp {
         const raw = (this.currentMessageEl.dataset.raw || '') + text;
         this.currentMessageEl.dataset.raw = raw;
         this.currentMessageEl.innerHTML = this.renderContent(raw);
+        this.scrollToBottom();
+    }
+
+    appendToThinking(text) {
+        // Ensure message bubble exists
+        if (!this.currentMessageEl) {
+            this.createMessage(
+                this._currentDebaterName || 'Unknown',
+                this._currentDebaterColor || '#333333',
+                this._currentDebaterAvatar || '💬',
+                'debater'
+            );
+        }
+
+        // Create thinking elements on first call
+        if (!this.currentMessageEl.querySelector('.thinking-text')) {
+            const tag = document.createElement('span');
+            tag.className = 'thinking-tag';
+            tag.textContent = '💭 thinking';
+
+            const thinkingSpan = document.createElement('span');
+            thinkingSpan.className = 'thinking-text';
+
+            const divider = document.createElement('span');
+            divider.className = 'thinking-divider';
+
+            this.currentMessageEl.appendChild(tag);
+            this.currentMessageEl.appendChild(thinkingSpan);
+            this.currentMessageEl.appendChild(divider);
+        }
+
+        // Append text to thinking span
+        const thinkingEl = this.currentMessageEl.querySelector('.thinking-text');
+        thinkingEl.textContent += text;
         this.scrollToBottom();
     }
 
@@ -734,6 +774,13 @@ class DebateApp {
 
         const isDark = document.documentElement.classList.contains('dark');
 
+        const bg = isDark ? '#121217' : '#f5f1ea';
+        const fg = isDark ? '#e4e0d8' : '#1a1714';
+        const msgBg = isDark ? '#24242f' : '#fff';
+        const userBg = isDark ? 'linear-gradient(135deg,rgba(122,148,174,.12),#24242f)' : 'linear-gradient(135deg,rgba(45,62,80,.07),#fff)';
+        const border = isDark ? '#2e2e3e' : '#ddd7cc';
+        const muted = isDark ? '#706a60' : '#9a9183';
+
         let body = '';
         msgEls.forEach(el => {
             if (el.classList.contains('system')) {
@@ -749,6 +796,12 @@ class DebateApp {
                 // otherwise fall back to textContent for safety
                 const contentEl = el.querySelector('.message-content') ||
                                   el.querySelector('.tool-card-content');
+                // Extract thinking text if present
+                const thinkingEl = el.querySelector('.thinking-text');
+                let thinkingContent = '';
+                if (thinkingEl) {
+                    thinkingContent = `<div style="color:${muted};font-size:.82rem;font-style:italic;margin-bottom:8px;padding:6px 10px;background:${bg};border-radius:6px">💭 ${this.escapeHtml(thinkingEl.textContent)}</div>`;
+                }
                 let content;
                 if (el.classList.contains('user') || el.classList.contains('system')) {
                     content = this.escapeHtml(contentEl?.textContent || '');
@@ -762,17 +815,10 @@ class DebateApp {
                 const cls = isUser ? 'user-msg' : (isToolCard ? 'tool-msg' : 'debater-msg');
                 body += `<div class="${cls}">
   <div class="msg-header"><span class="avatar">${this.escapeHtml(avatar)}</span> <span class="sender" style="color:${color}">${this.escapeHtml(sender)}</span> <span class="time">${this.escapeHtml(time)}</span></div>
-  <div class="msg-body">${content}</div>
+  <div class="msg-body">${thinkingContent}${content}</div>
 </div>\n`;
             }
         });
-
-        const bg = isDark ? '#121217' : '#f5f1ea';
-        const fg = isDark ? '#e4e0d8' : '#1a1714';
-        const msgBg = isDark ? '#24242f' : '#fff';
-        const userBg = isDark ? 'linear-gradient(135deg,rgba(122,148,174,.12),#24242f)' : 'linear-gradient(135deg,rgba(45,62,80,.07),#fff)';
-        const border = isDark ? '#2e2e3e' : '#ddd7cc';
-        const muted = isDark ? '#706a60' : '#9a9183';
 
         const html = `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><title>${this.escapeHtml(topic)}</title>
