@@ -1110,24 +1110,28 @@ button:hover {
 
 .thinking-tag {
     display: inline-block;
-    background: var(--bg-elevated);
     color: var(--ink-muted);
     font-size: 13px;
     padding: 3px 10px;
     border-radius: var(--radius-sm);
     margin-bottom: 6px;
+    font-weight: 500;
 }
 
 .thinking-text {
     display: block;
+    background: var(--bg-input);
     color: var(--ink-muted);
     font-size: 14px;
     line-height: 1.7;
     margin: 8px 0;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border);
 }
 
 .thinking-divider {
     display: block;
     border-top: 1px solid var(--border);
-    margin: 8px 0;
+    margin: 10px 0;
 }
