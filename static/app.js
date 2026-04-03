@@ -498,16 +498,20 @@ class DebateApp {
             );
         }
 
-        // Create thinking elements on first call
-        if (!this.currentMessageEl.querySelector('.thinking-text')) {
-            // Create clickable header (like tool-card)
+        // Create thinking section OUTSIDE message-content (as a sibling)
+        if (!this.currentThinkingEl) {
+            const messageBubble = this.currentMessageEl.parentElement;
+
+            const thinkingSection = document.createElement('div');
+            thinkingSection.className = 'thinking-section';
+
             const header = document.createElement('div');
             header.className = 'thinking-header';
             header.style.cursor = 'pointer';
 
             const toggle = document.createElement('span');
             toggle.className = 'thinking-toggle';
-            toggle.textContent = '▼';  // Expanded during streaming
+            toggle.textContent = '▼';
 
             const label = document.createElement('span');
             label.className = 'thinking-label';
@@ -519,34 +523,34 @@ class DebateApp {
             const thinkingSpan = document.createElement('div');
             thinkingSpan.className = 'thinking-text';
 
-            const divider = document.createElement('div');
-            divider.className = 'thinking-divider';
+            thinkingSection.appendChild(header);
+            thinkingSection.appendChild(thinkingSpan);
 
-            this.currentMessageEl.appendChild(header);
-            this.currentMessageEl.appendChild(thinkingSpan);
-            this.currentMessageEl.appendChild(divider);
+            // Insert BEFORE message-content
+            messageBubble.insertBefore(thinkingSection, this.currentMessageEl);
+
+            this.currentThinkingEl = thinkingSection;
         }
 
         // Append text to thinking span
-        const thinkingEl = this.currentMessageEl.querySelector('.thinking-text');
-        thinkingEl.textContent += text;
+        const thinkingText = this.currentThinkingEl.querySelector('.thinking-text');
+        thinkingText.textContent += text;
         this.scrollToBottom();
     }
 
     finalizeMessage() {
         if (this.currentMessageEl) {
-            // Preserve thinking elements before re-rendering
-            const thinkingHeader = this.currentMessageEl.querySelector('.thinking-header');
-            const thinkingText = this.currentMessageEl.querySelector('.thinking-text');
-            const thinkingDivider = this.currentMessageEl.querySelector('.thinking-divider');
+            // Thinking section is a sibling to message-content (stored in currentThinkingEl)
+            const thinkingSection = this.currentThinkingEl;
+            const thinkingHeader = thinkingSection?.querySelector('.thinking-header');
+            const thinkingText = thinkingSection?.querySelector('.thinking-text');
             const hasThinking = thinkingText && thinkingText.textContent.trim();
 
             const raw = this.currentMessageEl.dataset.raw || '';
             this.currentMessageEl.innerHTML = this.renderContent(raw);
 
-            // Re-attach thinking elements if they existed and had content
+            // Collapse thinking if it existed and had content
             if (hasThinking) {
-                // Collapse the thinking content
                 thinkingText.classList.add('thinking-collapsed');
                 thinkingHeader.querySelector('.thinking-toggle').textContent = '▶';
                 thinkingHeader.querySelector('.thinking-label').textContent = ' 💭 thinking';
@@ -556,11 +560,9 @@ class DebateApp {
                     const collapsed = thinkingText.classList.toggle('thinking-collapsed');
                     thinkingHeader.querySelector('.thinking-toggle').textContent = collapsed ? '▶' : '▼';
                 };
-
-                this.currentMessageEl.prepend(thinkingDivider);
-                this.currentMessageEl.prepend(thinkingText);
-                this.currentMessageEl.prepend(thinkingHeader);
             }
+
+            this.currentThinkingEl = null;
         }
         this.currentMessageEl = null;
     }

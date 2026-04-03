@@ -1105,6 +1105,11 @@ button:hover {
    Thinking mode — reasoning model inline thinking display
    ═══════════════════════════════════════════════════════════════ */
 
+.thinking-section {
+    /* No background, no border - blends with message */
+    margin-bottom: 8px;
+}
+
 .thinking-header {
     display: flex;
     align-items: center;
