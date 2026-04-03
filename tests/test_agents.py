@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from pydantic_ai.models import Model
 from agents import (
     create_debater_agent,
+    create_debater_agent_no_search,
     create_judge_agent,
     DebaterDeps,
     DEBATE_RULES,
@@ -137,3 +138,22 @@ def test_judge_agent_has_no_web_search_tool():
         agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
     tool_names = list(agent._function_toolset.tools.keys())
     assert "web_search" not in tool_names
+
+
+def test_debater_agent_has_thinking_enabled():
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key")
+    assert agent.model_settings.get("thinking") is True
+
+
+def test_debater_agent_no_search_has_thinking_enabled():
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_debater_agent_no_search("deepseek-chat", "https://api.example.com", "test-key")
+    assert agent.model_settings.get("thinking") is True
+
+
+def test_judge_agent_does_not_have_thinking_enabled():
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
+    settings = agent.model_settings or {}
+    assert settings.get("thinking") is not True

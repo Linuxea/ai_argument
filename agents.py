@@ -142,6 +142,7 @@ def create_debater_agent(model_name: str, base_url: str | None = None, api_key: 
         output_type=str,
         instructions=_build_debater_instructions,
         tools=[web_search],
+        model_settings={'thinking': True},
     )
     return agent
 
@@ -154,6 +155,7 @@ def create_debater_agent_no_search(model_name: str, base_url: str | None = None,
         output_type=str,
         instructions=_build_debater_instructions,
         tools=[],
+        model_settings={'thinking': True},
     )
     return agent
 
