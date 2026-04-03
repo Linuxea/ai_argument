@@ -459,21 +459,18 @@ class DebateApp {
         timeEl.textContent = time;
         header.appendChild(timeEl);
 
-        const content = document.createElement('div');
-        content.className = 'message-content';
-
         message.appendChild(header);
-        message.appendChild(content);
+        // Don't create message-content yet - wait for actual content
 
         this.messages.appendChild(message);
-        this.currentMessageEl = content;
+        this.currentMessageContainer = message; // Store the container, not content
+        this.currentMessageEl = null; // Will be created when content arrives
         this._lastSpeakerName = name;
     }
 
     appendToMessage(text) {
-        if (!this.currentMessageEl) {
-            // No active bubble — create one for the same debater
-            // (happens after a tool_call event finalized the previous bubble)
+        if (!this.currentMessageContainer) {
+            // No active message container — create one
             this.createMessage(
                 this._currentDebaterName || 'Unknown',
                 this._currentDebaterColor || '#333333',
@@ -481,6 +478,15 @@ class DebateApp {
                 'debater'
             );
         }
+
+        // Create message-content if it doesn't exist yet
+        if (!this.currentMessageEl) {
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            this.currentMessageContainer.appendChild(content);
+            this.currentMessageEl = content;
+        }
+
         const raw = (this.currentMessageEl.dataset.raw || '') + text;
         this.currentMessageEl.dataset.raw = raw;
         this.currentMessageEl.innerHTML = this.renderContent(raw);
@@ -488,8 +494,8 @@ class DebateApp {
     }
 
     appendToThinking(text) {
-        // Ensure message bubble exists
-        if (!this.currentMessageEl) {
+        // Ensure message container exists
+        if (!this.currentMessageContainer) {
             this.createMessage(
                 this._currentDebaterName || 'Unknown',
                 this._currentDebaterColor || '#333333',
@@ -498,10 +504,8 @@ class DebateApp {
             );
         }
 
-        // Create thinking section OUTSIDE message-content (as a sibling)
+        // Create thinking section if it doesn't exist
         if (!this.currentThinkingEl) {
-            const messageBubble = this.currentMessageEl.parentElement;
-
             const thinkingSection = document.createElement('div');
             thinkingSection.className = 'thinking-section';
 
@@ -526,8 +530,8 @@ class DebateApp {
             thinkingSection.appendChild(header);
             thinkingSection.appendChild(thinkingSpan);
 
-            // Insert BEFORE message-content
-            messageBubble.insertBefore(thinkingSection, this.currentMessageEl);
+            // Append to message container (thinking is independent of message-content)
+            this.currentMessageContainer.appendChild(thinkingSection);
 
             this.currentThinkingEl = thinkingSection;
         }
@@ -539,17 +543,12 @@ class DebateApp {
     }
 
     finalizeMessage() {
-        if (this.currentMessageEl) {
-            // Thinking section is a sibling to message-content (stored in currentThinkingEl)
-            const thinkingSection = this.currentThinkingEl;
-            const thinkingHeader = thinkingSection?.querySelector('.thinking-header');
-            const thinkingText = thinkingSection?.querySelector('.thinking-text');
+        // Handle thinking section collapse
+        if (this.currentThinkingEl) {
+            const thinkingHeader = this.currentThinkingEl.querySelector('.thinking-header');
+            const thinkingText = this.currentThinkingEl.querySelector('.thinking-text');
             const hasThinking = thinkingText && thinkingText.textContent.trim();
 
-            const raw = this.currentMessageEl.dataset.raw || '';
-            this.currentMessageEl.innerHTML = this.renderContent(raw);
-
-            // Collapse thinking if it existed and had content
             if (hasThinking) {
                 thinkingText.classList.add('thinking-collapsed');
                 thinkingHeader.querySelector('.thinking-toggle').textContent = '▶';
@@ -561,10 +560,18 @@ class DebateApp {
                     thinkingHeader.querySelector('.thinking-toggle').textContent = collapsed ? '▶' : '▼';
                 };
             }
-
-            this.currentThinkingEl = null;
         }
+
+        // Handle message-content rendering (if it exists)
+        if (this.currentMessageEl) {
+            const raw = this.currentMessageEl.dataset.raw || '';
+            this.currentMessageEl.innerHTML = this.renderContent(raw);
+        }
+
+        // Clear state
+        this.currentThinkingEl = null;
         this.currentMessageEl = null;
+        this.currentMessageContainer = null;
     }
 
     addSystemMessage(text) {
