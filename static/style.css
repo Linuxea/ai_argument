@@ -1112,18 +1112,18 @@ button:hover {
     display: inline-block;
     background: var(--bg-elevated);
     color: var(--ink-muted);
-    font-size: 11px;
-    padding: 2px 8px;
+    font-size: 13px;
+    padding: 3px 10px;
     border-radius: var(--radius-sm);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }
 
 .thinking-text {
     display: block;
     color: var(--ink-muted);
-    font-size: 11px;
-    line-height: 1.5;
-    margin: 4px 0;
+    font-size: 14px;
+    line-height: 1.7;
+    margin: 8px 0;
 }
 
 .thinking-divider {
