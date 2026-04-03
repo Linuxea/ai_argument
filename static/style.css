@@ -1102,51 +1102,9 @@ button:hover {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Thinking mode — reasoning model inline thinking display
+   Thinking mode — uses same styles as tool-card
    ═══════════════════════════════════════════════════════════════ */
 
-.thinking-header {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--ink-muted);
-    font-size: 13px;
-    padding: 4px 0;
-    margin-bottom: 4px;
-    user-select: none;
-}
-
-.thinking-header:hover {
-    color: var(--ink-soft);
-}
-
-.thinking-toggle {
-    display: inline-block;
-    width: 16px;
-    font-size: 11px;
-    transition: transform 0.2s;
-}
-
-.thinking-label {
-    font-weight: 500;
-}
-
-.thinking-text {
-    display: block;
-    color: var(--ink-muted);
-    font-size: 14px;
-    line-height: 1.7;
-    margin: 6px -20px 10px -20px;  /* 负边距：逃出 message-content 的 padding */
-    padding: 10px 20px;
-    background: var(--bg-base);  /* 使用页面背景色，非卡片背景 */
-}
-
-.thinking-text.thinking-collapsed {
-    display: none;
-}
-
-.thinking-divider {
-    display: block;
-    border-top: 1px solid var(--border);
-    margin: 12px -20px;  /* 同样逃出卡片 */
-}
+/* Thinking now uses .tool-card-label, .tool-card-toggle
+ .tool-card-results classes */
+/* No separate styles needed - they inherit from tool-card styles */
