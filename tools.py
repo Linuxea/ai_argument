@@ -1,3 +1,6 @@
+import asyncio
+import time
+
 import httpx
 from pydantic_ai import RunContext
 
@@ -6,6 +9,26 @@ from agents import DebaterDeps
 BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 MAX_RESULTS = 5
 MAX_TOTAL_CHARS = 1000
+
+
+class _RateLimiter:
+    """Simple rate limiter: max 1 call per min_interval seconds."""
+
+    def __init__(self, min_interval: float = 1.0):
+        self._min_interval = min_interval
+        self._last = 0.0
+        self._lock = asyncio.Lock()
+
+    async def acquire(self):
+        async with self._lock:
+            now = time.monotonic()
+            wait = self._min_interval - (now - self._last)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last = time.monotonic()
+
+
+_limiter = _RateLimiter(min_interval=1.0)
 
 
 async def web_search(ctx: RunContext[DebaterDeps], query: str) -> str:
@@ -17,6 +40,7 @@ async def web_search(ctx: RunContext[DebaterDeps], query: str) -> str:
     Args:
         query: A concise search query (1-10 words recommended).
     """
+    await _limiter.acquire()
     api_key = ctx.deps.brave_api_key
     if not api_key:
         return "Search is not configured (no API key). Proceed without search results."
