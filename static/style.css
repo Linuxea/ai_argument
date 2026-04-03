@@ -1103,3 +1103,31 @@ select {
 button:hover {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Thinking mode — reasoning model inline thinking display
+   ═══════════════════════════════════════════════════════════════ */
+
+.thinking-tag {
+    display: inline-block;
+    background: var(--bg-elevated);
+    color: var(--ink-muted);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 4px;
+}
+
+.thinking-text {
+    display: block;
+    color: var(--ink-muted);
+    font-size: 11px;
+    line-height: 1.5;
+    margin: 4px 0;
+}
+
+.thinking-divider {
+    display: block;
+    border-top: 1px solid var(--border);
+    margin: 8px 0;
+}
