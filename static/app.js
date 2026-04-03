@@ -499,34 +499,36 @@ class DebateApp {
         }
 
         // Create thinking elements on first call
-        if (!this.currentMessageEl.querySelector('.tool-card-results')) {
-            // Create clickable header (same as tool-card)
-            const label = document.createElement('div');
-            label.className = 'tool-card-label';
-            label.style.cursor = 'pointer';
+        if (!this.currentMessageEl.querySelector('.thinking-text')) {
+            // Create clickable header (like tool-card)
+            const header = document.createElement('div');
+            header.className = 'thinking-header';
+            header.style.cursor = 'pointer';
 
             const toggle = document.createElement('span');
-            toggle.className = 'tool-card-toggle';
+            toggle.className = 'thinking-toggle';
             toggle.textContent = '▼';  // Expanded during streaming
 
-            const labelText = document.createTextNode(' 💭 thinking...');
+            const label = document.createElement('span');
+            label.className = 'thinking-label';
+            label.textContent = ' 💭 thinking...';
 
-            label.appendChild(toggle);
-            label.appendChild(labelText);
+            header.appendChild(toggle);
+            header.appendChild(label);
 
             const thinkingSpan = document.createElement('div');
-            thinkingSpan.className = 'tool-card-results';
+            thinkingSpan.className = 'thinking-text';
 
             const divider = document.createElement('div');
             divider.className = 'thinking-divider';
 
-            this.currentMessageEl.appendChild(label);
+            this.currentMessageEl.appendChild(header);
             this.currentMessageEl.appendChild(thinkingSpan);
             this.currentMessageEl.appendChild(divider);
         }
 
         // Append text to thinking span
-        const thinkingEl = this.currentMessageEl.querySelector('.tool-card-results');
+        const thinkingEl = this.currentMessageEl.querySelector('.thinking-text');
         thinkingEl.textContent += text;
         this.scrollToBottom();
     }
@@ -534,8 +536,8 @@ class DebateApp {
     finalizeMessage() {
         if (this.currentMessageEl) {
             // Preserve thinking elements before re-rendering
-            const thinkingLabel = this.currentMessageEl.querySelector('.tool-card-label');
-            const thinkingText = this.currentMessageEl.querySelector('.tool-card-results');
+            const thinkingHeader = this.currentMessageEl.querySelector('.thinking-header');
+            const thinkingText = this.currentMessageEl.querySelector('.thinking-text');
             const thinkingDivider = this.currentMessageEl.querySelector('.thinking-divider');
             const hasThinking = thinkingText && thinkingText.textContent.trim();
 
@@ -545,19 +547,19 @@ class DebateApp {
             // Re-attach thinking elements if they existed and had content
             if (hasThinking) {
                 // Collapse the thinking content
-                thinkingText.classList.add('tool-card-collapsed');
-                thinkingLabel.querySelector('.tool-card-toggle').textContent = '▶';
-                thinkingLabel.childNodes[1].textContent = ' 💭 thinking';
+                thinkingText.classList.add('thinking-collapsed');
+                thinkingHeader.querySelector('.thinking-toggle').textContent = '▶';
+                thinkingHeader.querySelector('.thinking-label').textContent = ' 💭 thinking';
 
                 // Add click handler for toggle
-                thinkingLabel.onclick = () => {
-                    const collapsed = thinkingText.classList.toggle('tool-card-collapsed');
-                    thinkingLabel.querySelector('.tool-card-toggle').textContent = collapsed ? '▶' : '▼';
+                thinkingHeader.onclick = () => {
+                    const collapsed = thinkingText.classList.toggle('thinking-collapsed');
+                    thinkingHeader.querySelector('.thinking-toggle').textContent = collapsed ? '▶' : '▼';
                 };
 
                 this.currentMessageEl.prepend(thinkingDivider);
                 this.currentMessageEl.prepend(thinkingText);
-                this.currentMessageEl.prepend(thinkingLabel);
+                this.currentMessageEl.prepend(thinkingHeader);
             }
         }
         this.currentMessageEl = null;
