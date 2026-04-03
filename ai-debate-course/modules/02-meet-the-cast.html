@@ -1,0 +1,326 @@
+<!-- Module 2 — Meet the Cast -->
+<section class="module" id="module-2" style="background: var(--color-bg-warm);">
+
+  <div class="module-content">
+
+    <!-- ─── HEADER ─── -->
+    <div class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">Meet the Cast</h1>
+      <p class="module-subtitle">The actors that make the debate happen</p>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SCREEN 1 — The Cast of Characters                          -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="screen">
+
+      <h2 class="screen-heading animate-in">The Cast of Characters</h2>
+
+      <p class="animate-in">
+        Every app is built from pieces that each do one job well. Think of them as actors in a play — each has a role, a script, and a place on stage. Here are the five main characters in our app.
+      </p>
+
+      <div class="pattern-cards stagger-children animate-in">
+
+        <div class="pattern-card" style="border-top-color: var(--color-actor-2);">
+          <div class="pattern-icon" style="background: #E4F2F7; color: var(--color-actor-2);">&#9881;</div>
+          <div class="pattern-title" style="color: var(--color-actor-2);">DebateEngine</div>
+          <p class="pattern-desc">The referee. Lives in <code>debate_engine.py</code>. Runs the debate loop, tracks <span class="term" data-definition="The current condition of the app at any moment — things like 'which round are we on,' 'whose turn is it,' and 'what has been said so far.' State is like the scoreboard in a game.">state</span>, and manages whose turn it is. Like a debate moderator who also runs the scoreboard.</p>
+        </div>
+
+        <div class="pattern-card" style="border-top-color: var(--color-actor-4);">
+          <div class="pattern-icon" style="background: #FDF5E0; color: var(--color-actor-4);">&#9733;</div>
+          <div class="pattern-title" style="color: var(--color-actor-4);">Agents</div>
+          <p class="pattern-desc">The debaters' brains. Each <span class="term" data-definition="A wrapper around an AI model (like DeepSeek or GPT) that has its own instructions, tools, and personality. In this app, each debater gets a separate Agent — think of it as a brain with a specific personality attached.">agent</span> in <code>agents.py</code> knows its stance, personality, and has tools like web search. Like giving each debater a brain transplant with a different personality each time.</p>
+        </div>
+
+        <div class="pattern-card" style="border-top-color: var(--color-actor-5);">
+          <div class="pattern-icon" style="background: #E8F5EE; color: var(--color-actor-5);">&#128269;</div>
+          <div class="pattern-title" style="color: var(--color-actor-5);">Web Search Tool</div>
+          <p class="pattern-desc">The research assistant. <code>tools.py</code> searches Brave Search and returns results. Has a built-in <span class="term" data-definition="A mechanism that throttles how often something can happen. The search tool has a rate limiter of 1 request per second so it does not overwhelm the search API.">rate limiter</span> (max 1 search per second) so it stays polite.</p>
+        </div>
+
+        <div class="pattern-card" style="border-top-color: var(--color-actor-1);">
+          <div class="pattern-icon" style="background: #FDEEE9; color: var(--color-actor-1);">&#128279;</div>
+          <div class="pattern-title" style="color: var(--color-actor-1);">FastAPI Server</div>
+          <p class="pattern-desc">The switchboard operator. <code>main.py</code> routes incoming requests to the right <span class="term" data-definition="A specific URL address on the server that accepts requests. Each endpoint does one job. For example, /api/debate/start begins a new debate, and /api/debate/stream sends real-time updates.">endpoint</span>, serves the frontend, and manages <span class="term" data-definition="Server-Sent Events. A way for the server to push updates to the frontend in real-time, like a live text feed. The frontend opens a connection and the server keeps sending messages as things happen.">SSE</span> connections.</p>
+        </div>
+
+        <div class="pattern-card" style="border-top-color: var(--color-actor-3);">
+          <div class="pattern-icon" style="background: #F0ECF5; color: var(--color-actor-3);">&#127916;</div>
+          <div class="pattern-title" style="color: var(--color-actor-3);">Frontend</div>
+          <p class="pattern-desc">The stage. <code>app.js</code> + <code>index.html</code> render the debate in real-time using SSE events. Handles debater selection, drag-to-reorder, and renders <span class="term" data-definition="A simple way to format text with headers, bold, links, and lists. It is what AI models often output, and the frontend converts it into styled HTML.">markdown</span> into styled text.</p>
+        </div>
+
+      </div>
+
+      <div class="callout callout-accent animate-in">
+        <span class="callout-icon">&#128161;</span>
+        <div class="callout-content">
+          <span class="callout-title">Key Insight</span>
+          <p>Every piece of software has a "separation of concerns" pattern — each file handles one job. <code>main.py</code> handles HTTP requests, <code>debate_engine.py</code> handles debate logic, <code>agents.py</code> handles AI personalities, and <code>tools.py</code> handles external searches. When you need to change something, this separation tells you exactly where to look. This pattern is the #1 thing that helps you steer AI coding tools effectively — you can say "put this logic in the engine, not the <span class="term" data-definition="Short for Application Programming Interface — a standardized way for two programs to talk to each other. In this app, the frontend talks to the backend through API endpoints, and the backend talks to the AI model through its API.">API</span> layer" and get better code.</p>
+        </div>
+      </div>
+
+    </div><!-- /screen 1 -->
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SCREEN 2 — How They Talk to Each Other                      -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="screen">
+
+      <h2 class="screen-heading animate-in">How They Talk to Each Other</h2>
+
+      <p class="animate-in">
+        Imagine these five components in a group chat. When a debate starts, they fire off messages in sequence. Click "Next" to watch the conversation unfold, or "Show All" to see it all at once.
+      </p>
+
+      <!-- Group chat window -->
+      <div class="chat-window animate-in" id="chat-module2">
+
+        <div class="chat-messages">
+
+          <div class="chat-message" data-sender="fastapi" style="display:none;">
+            <div class="chat-avatar" style="background: var(--color-actor-1);">FP</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-1);">FastAPI</span>
+              <p>Hey DebateEngine, someone just started a debate! Topic: 'Should AI replace teachers?'</p>
+            </div>
+          </div>
+
+          <div class="chat-message" data-sender="engine" style="display:none;">
+            <div class="chat-avatar" style="background: var(--color-actor-2);">DE</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-2);">DebateEngine</span>
+              <p>Got it. Loading debaters... 正方 (supporter), 反方 (opponent), 分析家 (analyst). Round 1 begins!</p>
+            </div>
+          </div>
+
+          <div class="chat-message" data-sender="engine" style="display:none;">
+            <div class="chat-avatar" style="background: var(--color-actor-2);">DE</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-2);">DebateEngine</span>
+              <p>Agent for 正方, it's your turn. Here's the debate topic and what others have said...</p>
+            </div>
+          </div>
+
+          <div class="chat-message" data-sender="agent" style="display:none;">
+            <div class="chat-avatar" style="background: var(--color-actor-4);">AG</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-4);">Agent</span>
+              <p>Hmm, let me search for some recent data first...</p>
+            </div>
+          </div>
+
+          <div class="chat-message" data-sender="search" style="display:none;">
+            <div class="chat-avatar" style="background: var(--color-actor-5);">WS</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-5);">WebSearch</span>
+              <p>Here are 5 results about AI in education from 2026. Total 847 characters.</p>
+            </div>
+          </div>
+
+          <div class="chat-message" data-sender="agent" style="display:none;">
+            <div class="chat-avatar" style="background: var(--color-actor-4);">AG</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-4);">Agent</span>
+              <p>Great. Based on my research, here's my opening argument...</p>
+            </div>
+          </div>
+
+          <div class="chat-message" data-sender="engine" style="display:none;">
+            <div class="chat-avatar" style="background: var(--color-actor-2);">DE</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-2);">DebateEngine</span>
+              <p>Done with 正方's turn. Streaming response to Frontend via SSE...</p>
+            </div>
+          </div>
+
+          <div class="chat-message" data-sender="frontend" style="display:none;">
+            <div class="chat-avatar" style="background: var(--color-actor-3);">FE</div>
+            <div class="chat-bubble">
+              <span class="chat-sender" style="color: var(--color-actor-3);">Frontend</span>
+              <p>Received! Rendering 正方's message with markdown and thinking section...</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Typing indicator -->
+        <div class="chat-typing" style="display:none;">
+          <div class="chat-avatar" id="chat-module2-typing-avatar" style="background: var(--color-actor-1);">FP</div>
+          <div class="chat-typing-dots">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="chat-controls">
+          <button class="btn btn-primary chat-next-btn">Next Message</button>
+          <button class="btn chat-all-btn">Show All</button>
+          <button class="btn chat-reset-btn">Reset</button>
+          <span class="chat-progress">0 / 8 messages</span>
+        </div>
+
+      </div>
+
+      <p class="animate-in">
+        Notice the chain: FastAPI receives the request, DebateEngine orchestrates, Agents think (sometimes calling the Search Tool), and the Frontend renders. Each component only talks to its immediate neighbors — they never skip links in the chain.
+      </p>
+
+    </div><!-- /screen 2 -->
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SCREEN 3 — The Architecture                                -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="screen">
+
+      <h2 class="screen-heading animate-in">The Architecture</h2>
+
+      <p class="animate-in">
+        Here is how all five components fit together. The app is split into three zones: your <strong>Browser</strong>, the <strong>Server</strong>, and the <strong>External World</strong>. Click any component to learn what it does.
+      </p>
+
+      <!-- Architecture diagram -->
+      <div class="arch-diagram animate-in">
+
+        <!-- Browser Zone -->
+        <div class="arch-zone" style="border-color: var(--color-actor-3); background: rgba(123,109,170,0.03);">
+          <div class="arch-zone-label" style="color: var(--color-actor-3);">Browser Zone</div>
+          <div class="arch-component" data-desc="The DebateApp class in app.js manages the entire UI — rendering messages, handling SSE events, debater selection, drag-to-reorder, theme toggling, and the search drawer.">
+            <span class="arch-icon">&#127916;</span>
+            <strong>Frontend</strong>
+            <span style="font-size:var(--text-xs);color:var(--color-text-muted);">index.html + app.js + style.css</span>
+          </div>
+        </div>
+
+        <!-- Server Zone -->
+        <div class="arch-zone" style="border-color: var(--color-actor-1); background: rgba(217,79,48,0.03);">
+          <div class="arch-zone-label" style="color: var(--color-actor-1);">Server Zone</div>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);">
+            <div class="arch-component" data-desc="The main.py file defines all API endpoints and serves the frontend. It uses a lifespan handler to create the DebateEngine at startup and cache the HTML.">
+              <span class="arch-icon">&#128279;</span>
+              <strong>FastAPI Server</strong>
+              <span style="font-size:var(--text-xs);color:var(--color-text-muted);">main.py</span>
+            </div>
+            <div class="arch-component" data-desc="The heart of the app. Manages debate state (topic, debaters, history, current round), builds prompts for each turn, streams agent responses, and emits SSE events.">
+              <span class="arch-icon">&#9881;</span>
+              <strong>DebateEngine</strong>
+              <span style="font-size:var(--text-xs);color:var(--color-text-muted);">debate_engine.py</span>
+            </div>
+            <div class="arch-component" data-desc="Three types: debater with search, debater without search, and judge. Each is a PydanticAI Agent that receives dynamic system instructions on every run.">
+              <span class="arch-icon">&#9733;</span>
+              <strong>Agents</strong>
+              <span style="font-size:var(--text-xs);color:var(--color-text-muted);">agents.py</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- External Zone -->
+        <div class="arch-zone" style="border-color: var(--color-text-muted); background: rgba(158,151,144,0.03);">
+          <div class="arch-zone-label" style="color: var(--color-text-muted);">External Zone</div>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);">
+            <div class="arch-component" data-desc="Any OpenAI-compatible API — DeepSeek, OpenAI, Ollama, etc. The agents send prompts here and get back streaming responses.">
+              <span class="arch-icon">&#129302;</span>
+              <strong>LLM API</strong>
+              <span style="font-size:var(--text-xs);color:var(--color-text-muted);">DeepSeek / OpenAI / Ollama</span>
+            </div>
+            <div class="arch-component" data-desc="A web search API. The web_search tool in tools.py calls it, with a rate limiter that enforces 1 request per second.">
+              <span class="arch-icon">&#128269;</span>
+              <strong>Brave Search</strong>
+              <span style="font-size:var(--text-xs);color:var(--color-text-muted);">search API</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-description">Click any component above to see what it does.</div>
+
+      </div>
+
+      <p class="animate-in">
+        The arrows go one way: Browser sends requests to the Server, and the Server streams responses back. The Server calls out to external <span class="term" data-definition="Short for Application Programming Interface — a standardized way for two programs to talk to each other. In this app, the frontend talks to the backend through API endpoints, and the backend talks to the AI model through its API.">APIs</span> for AI brains and web search. The <span class="term" data-definition="Short for application — in this course, it refers to this AI Debate Chatroom program. The codebase is organized into modules (files), each handling one area of concern.">module</span> structure keeps each concern isolated.
+      </p>
+
+    </div><!-- /screen 3 -->
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SCREEN 4 — Check Your Understanding                        -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="screen">
+
+      <h2 class="screen-heading animate-in">Check Your Understanding</h2>
+
+      <div class="quiz-container animate-in" id="quiz-module2">
+
+        <div class="quiz-question-block"
+             data-correct="option-b"
+             data-explanation-right="The <code>_advance_turn</code> method in DebateEngine controls turn order. If turns are wrong, that's the place to check."
+             data-explanation-wrong="Think about which component decides WHO speaks WHEN. The frontend just renders what it receives, and the agents just respond when asked.">
+
+          <p class="quiz-question">
+            Q1: A user reports that debaters are responding out of order. Where would you look first?
+          </p>
+          <div class="quiz-options">
+            <button class="quiz-option" onclick="selectOption(this)" data-value="option-a">
+              <span class="quiz-option-radio"></span>
+              <span><code>app.js</code> — the frontend rendering code</span>
+            </button>
+            <button class="quiz-option" onclick="selectOption(this)" data-value="option-b">
+              <span class="quiz-option-radio"></span>
+              <span><code>debate_engine.py</code> — the turn advancement logic</span>
+            </button>
+            <button class="quiz-option" onclick="selectOption(this)" data-value="option-c">
+              <span class="quiz-option-radio"></span>
+              <span><code>agents.py</code> — the debater personalities</span>
+            </button>
+            <button class="quiz-option" onclick="selectOption(this)" data-value="option-d">
+              <span class="quiz-option-radio"></span>
+              <span><code>tools.py</code> — the search tool</span>
+            </button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+
+        <div class="quiz-question-block"
+             data-correct="option-c"
+             data-explanation-right="Tools are the way to give agents new capabilities. You'd create an <code>image_search</code> tool in <code>tools.py</code>, then register it on a new agent type in <code>agents.py</code>."
+             data-explanation-wrong="Think about where capabilities live. The agents use tools to interact with the outside world. A new search type = a new tool.">
+
+          <p class="quiz-question">
+            Q2: You want to add a new type of debater that can look up images, not web pages. Which component do you modify?
+          </p>
+          <div class="quiz-options">
+            <button class="quiz-option" onclick="selectOption(this)" data-value="option-a">
+              <span class="quiz-option-radio"></span>
+              <span><code>main.py</code> — add a new API endpoint</span>
+            </button>
+            <button class="quiz-option" onclick="selectOption(this)" data-value="option-b">
+              <span class="quiz-option-radio"></span>
+              <span><code>debate_engine.py</code> — change the debate loop</span>
+            </button>
+            <button class="quiz-option" onclick="selectOption(this)" data-value="option-c">
+              <span class="quiz-option-radio"></span>
+              <span><code>tools.py</code> — create a new tool <span class="term" data-definition="A named block of reusable code that performs a specific task. Functions are like recipes — define them once, call them by name whenever you need that task done.">function</span></span>
+            </button>
+            <button class="quiz-option" onclick="selectOption(this)" data-value="option-d">
+              <span class="quiz-option-radio"></span>
+              <span><code>app.js</code> — add image rendering</span>
+            </button>
+          </div>
+          <div class="quiz-feedback"></div>
+        </div>
+
+        <div>
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try Again</button>
+        </div>
+
+      </div>
+
+    </div><!-- /screen 4 -->
+
+  </div><!-- /module-content -->
+</section>
