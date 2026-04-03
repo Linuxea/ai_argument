@@ -420,3 +420,73 @@ def test_engine_stores_brave_api_key():
     engine, _ = _make_engine()
     engine.brave_api_key = "my-key"
     assert engine.brave_api_key == "my-key"
+
+
+@pytest.mark.asyncio
+async def test_run_turn_emits_thinking_events():
+    """When the mock agent returns thinking, thinking_chunk events are emitted."""
+    engine, mock = _make_engine(responses=["My argument."])
+    mock.thinking = ["Let me analyze this step by step..."]
+
+    debater = Debater(name="Thinker", personality="Deep thinker.")
+    engine.state = DebateState(topic="Test topic", debaters=[debater])
+    engine._history = {"Thinker": []}
+
+    await engine.run_turn()
+
+    events = []
+    while not engine.event_queue.empty():
+        events.append(await engine.event_queue.get())
+
+    event_types = [e.type for e in events]
+    assert "thinking_chunk" in event_types, f"Got events: {event_types}"
+
+    thinking_events = [e for e in events if e.type == "thinking_chunk"]
+    thinking_text = "".join(e.payload["text_chunk"] for e in thinking_events)
+    assert "Let me analyze this step by step..." in thinking_text
+
+
+@pytest.mark.asyncio
+async def test_run_turn_thinking_followed_by_finalize():
+    """After thinking ends, a debater_finalize event is emitted before text starts."""
+    engine, mock = _make_engine(responses=["My argument."])
+    mock.thinking = ["Thinking content"]
+
+    debater = Debater(name="Thinker", personality="Deep thinker.")
+    engine.state = DebateState(topic="Test topic", debaters=[debater])
+    engine._history = {"Thinker": []}
+
+    await engine.run_turn()
+
+    events = []
+    while not engine.event_queue.empty():
+        events.append(await engine.event_queue.get())
+
+    event_types = [e.type for e in events]
+    assert "debater_finalize" in event_types, f"Got events: {event_types}"
+
+    last_thinking_idx = max(i for i, e in enumerate(events) if e.type == "thinking_chunk")
+    first_finalize_after = next(
+        i for i, e in enumerate(events)
+        if e.type == "debater_finalize" and i > last_thinking_idx
+    )
+    assert first_finalize_after > last_thinking_idx
+
+
+@pytest.mark.asyncio
+async def test_run_turn_no_thinking_events_without_thinking():
+    """When no thinking is returned, no thinking_chunk events are emitted."""
+    engine, mock = _make_engine(responses=["Just text, no thinking."])
+
+    debater = Debater(name="Simple", personality="Simple debater.")
+    engine.state = DebateState(topic="Test topic", debaters=[debater])
+    engine._history = {"Simple": []}
+
+    await engine.run_turn()
+
+    events = []
+    while not engine.event_queue.empty():
+        events.append(await engine.event_queue.get())
+
+    event_types = [e.type for e in events]
+    assert "thinking_chunk" not in event_types

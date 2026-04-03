@@ -5,7 +5,11 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic_ai import AgentRunResultEvent, FunctionToolCallEvent, FunctionToolResultEvent
-from pydantic_ai.messages import ModelMessage, PartStartEvent, PartDeltaEvent, TextPart, TextPartDelta
+from pydantic_ai.messages import (
+    ModelMessage, PartStartEvent, PartDeltaEvent,
+    TextPart, TextPartDelta,
+    ThinkingPart, ThinkingPartDelta,
+)
 from models import Debater
 from agents import create_debater_agent, create_debater_agent_no_search, create_judge_agent, DebaterDeps
 
@@ -152,6 +156,7 @@ class DebateEngine:
         full_text = ""
         current_query = ""
         result_all_messages = None
+        _thinking_active = False
 
         agent = self.debater_agent if debater.enable_search else self.debater_agent_no_search
 
@@ -160,8 +165,11 @@ class DebateEngine:
             deps=deps,
             message_history=self._history[debater.name],
         ):
-            # Handle PartStartEvent - contains initial content (e.g., "[[" at the start)
+            # Handle PartStartEvent — TextPart
             if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+                if _thinking_active:
+                    _thinking_active = False
+                    await self.event_queue.put(Event(type="debater_finalize", payload={}))
                 initial_content = event.part.content
                 if initial_content:
                     full_text += initial_content
@@ -174,7 +182,19 @@ class DebateEngine:
                             },
                         )
                     )
+            # Handle PartStartEvent — ThinkingPart
+            elif isinstance(event, PartStartEvent) and isinstance(event.part, ThinkingPart):
+                _thinking_active = True
+                initial = event.part.content
+                if initial:
+                    await self.event_queue.put(Event(
+                        type="thinking_chunk",
+                        payload={"debater_name": debater.name, "text_chunk": initial},
+                    ))
             elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                if _thinking_active:
+                    _thinking_active = False
+                    await self.event_queue.put(Event(type="debater_finalize", payload={}))
                 delta = event.delta.content_delta
                 full_text += delta
                 await self.event_queue.put(
@@ -186,6 +206,13 @@ class DebateEngine:
                         },
                     )
                 )
+            # Handle PartDeltaEvent — ThinkingPartDelta
+            elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, ThinkingPartDelta):
+                delta = event.delta.content_delta
+                await self.event_queue.put(Event(
+                    type="thinking_chunk",
+                    payload={"debater_name": debater.name, "text_chunk": delta},
+                ))
             elif isinstance(event, FunctionToolCallEvent):
                 args = event.part.args
                 if isinstance(args, str):
@@ -194,7 +221,6 @@ class DebateEngine:
                     except (json.JSONDecodeError, TypeError):
                         args = {}
                 current_query = args.get("query", "") if isinstance(args, dict) else ""
-                # Finalize current text bubble before showing search card
                 await self.event_queue.put(Event(type="debater_finalize", payload={}))
             elif isinstance(event, FunctionToolResultEvent):
                 result_text = ""
@@ -211,6 +237,10 @@ class DebateEngine:
                 ))
             elif isinstance(event, AgentRunResultEvent):
                 result_all_messages = event.result.all_messages()
+
+        # If thinking was the last thing streamed, finalize it
+        if _thinking_active:
+            await self.event_queue.put(Event(type="debater_finalize", payload={}))
 
         # Update this debater's message history
         if result_all_messages is not None:
