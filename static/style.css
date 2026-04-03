@@ -1136,8 +1136,9 @@ button:hover {
     color: var(--ink-muted);
     font-size: 14px;
     line-height: 1.7;
-    margin: 6px 0 10px 0;
-    padding: 0;
+    margin: 6px -20px 10px -20px;  /* 负边距：逃出 message-content 的 padding */
+    padding: 10px 20px;
+    background: var(--bg-base);  /* 使用页面背景色，非卡片背景 */
 }
 
 .thinking-text.thinking-collapsed {
@@ -1147,5 +1148,5 @@ button:hover {
 .thinking-divider {
     display: block;
     border-top: 1px solid var(--border);
-    margin: 12px 0;
+    margin: 12px -20px;  /* 同样逃出卡片 */
 }
