@@ -564,6 +564,12 @@ class DebateApp {
 
             this.currentThinkingEl = null;
         }
+
+        // Hide message-content if empty (only thinking, no reply)
+        if (this.currentMessageEl && !this.currentMessageEl.textContent.trim()) {
+            this.currentMessageEl.style.display = 'none';
+        }
+
         this.currentMessageEl = null;
     }
 
