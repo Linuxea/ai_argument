@@ -1,5 +1,6 @@
 import asyncio
 import json
+import random
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -33,7 +34,32 @@ async def lifespan(app: FastAPI):
     yield
 
 
+_DEBATER_HOT_TAKES = [
+    "You opened DevTools. The real debate is whether your code is the bug or the feature.",
+    "Every bug is just a feature that lost the debate.",
+    "In a debate between you and the code, the code always wins.",
+    "The best debater is the one who knows when to stop arguing and start debugging.",
+    "404: Interesting content not found. Just kidding. Here's a hot take instead.",
+    "Console.log is just you arguing with your future self.",
+    "Every CSS centering attempt is a debate between you and the universe.",
+    "The real debate: tabs or spaces? (We use tabs. Fight us.)",
+    "A good debater changes minds. A great debater changes the topic.",
+    "DevTools: where you go to argue with your own frontend.",
+]
+
 app = FastAPI(title="AI Debate Chatroom", lifespan=lifespan)
+
+
+@app.get("/.well-known/appspecific/com.chrome.devtools.json")
+async def chrome_devtools_easter_egg():
+    """Chrome DevTools well-known URI — returning unsolicited debate hot takes."""
+    return {
+        "message": random.choice(_DEBATER_HOT_TAKES),
+        "debate_tip": "Remember: a strong argument addresses the counterargument head-on.",
+        "api_notice": "This endpoint exists because Chrome DevTools requests it. "
+                      "We figured we'd have some fun with it.",
+        "surprise": "🔥 You found the easter egg! Not all heroes wear capes — some just open DevTools.",
+    }
 
 
 # Serve static files

@@ -1,10 +1,14 @@
-import os
-import yaml
 from pathlib import Path
+
+import yaml
+from dotenv import dotenv_values
+
 from models import Debater
 
-
 PRESETS_PATH = Path(__file__).parent / "presets.yaml"
+
+# Load .env file — returns a dict without touching os.environ
+_env = dotenv_values(Path(__file__).parent / ".env")
 
 
 def load_presets() -> list[Debater]:
@@ -15,18 +19,13 @@ def load_presets() -> list[Debater]:
 
 
 class Settings:
-    """Application settings with defaults for DeepSeek."""
+    """Application settings loaded exclusively from .env file."""
 
-    def __init__(
-        self,
-        api_base_url: str = "https://api.deepseek.com",
-        api_key: str = None,
-        model: str = "deepseek-reasoner",
-    ):
-        self.api_base_url = api_base_url
-        self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
-        self.model = model
-        self.brave_api_key = os.environ.get("BRAVE_API_KEY", "")
+    def __init__(self):
+        self.api_base_url = _env.get("API_BASE_URL", "https://api.deepseek.com")
+        self.api_key = _env.get("API_KEY", "")
+        self.model = _env.get("MODEL", "deepseek-reasoner")
+        self.brave_api_key = _env.get("BRAVE_API_KEY", "")
 
 
 def build_model_string(base_url: str, model: str) -> str:
