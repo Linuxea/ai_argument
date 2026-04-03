@@ -527,6 +527,10 @@ class DebateApp {
             const thinkingSpan = document.createElement('div');
             thinkingSpan.className = 'thinking-text';
 
+            const thinkingInner = document.createElement('div');
+            thinkingInner.className = 'thinking-text-inner';
+            thinkingSpan.appendChild(thinkingInner);
+
             thinkingSection.appendChild(header);
             thinkingSection.appendChild(thinkingSpan);
 
@@ -537,7 +541,7 @@ class DebateApp {
         }
 
         // Append text to thinking span
-        const thinkingText = this.currentThinkingEl.querySelector('.thinking-text');
+        const thinkingText = this.currentThinkingEl.querySelector('.thinking-text-inner');
         thinkingText.textContent += text;
         this.scrollToBottom();
     }
@@ -547,7 +551,8 @@ class DebateApp {
         if (this.currentThinkingEl) {
             const thinkingHeader = this.currentThinkingEl.querySelector('.thinking-header');
             const thinkingText = this.currentThinkingEl.querySelector('.thinking-text');
-            const hasThinking = thinkingText && thinkingText.textContent.trim();
+            const thinkingInner = this.currentThinkingEl.querySelector('.thinking-text-inner');
+            const hasThinking = thinkingInner && thinkingInner.textContent.trim();
 
             if (hasThinking) {
                 thinkingText.classList.add('thinking-collapsed');
@@ -557,7 +562,8 @@ class DebateApp {
                 // Add click handler for toggle
                 thinkingHeader.onclick = () => {
                     const collapsed = thinkingText.classList.toggle('thinking-collapsed');
-                    thinkingHeader.querySelector('.thinking-toggle').textContent = collapsed ? '▶' : '▼';
+                    const toggleEl = thinkingHeader.querySelector('.thinking-toggle');
+                    toggleEl.style.transform = collapsed ? 'rotate(0deg)' : 'rotate(90deg)';
                 };
             }
         }
@@ -670,11 +676,16 @@ class DebateApp {
 
         const results = document.createElement('div');
         results.className = 'tool-card-results tool-card-collapsed';
-        results.innerHTML = this.renderContent(resultSummary || '');
+
+        const resultsInner = document.createElement('div');
+        resultsInner.className = 'tool-card-results-inner';
+        resultsInner.innerHTML = this.renderContent(resultSummary || '');
+        results.appendChild(resultsInner);
 
         label.addEventListener('click', () => {
             const collapsed = results.classList.toggle('tool-card-collapsed');
-            label.querySelector('.tool-card-toggle').textContent = collapsed ? '▶' : '▼';
+            const toggleEl = label.querySelector('.tool-card-toggle');
+            toggleEl.style.transform = collapsed ? 'rotate(0deg)' : 'rotate(90deg)';
         });
 
         content.appendChild(label);

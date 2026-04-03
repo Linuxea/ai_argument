@@ -744,16 +744,26 @@ input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: none; }
     margin: 6px 0;
 }
 
-/* Collapsed state for search results */
+/* Smooth collapse via CSS Grid trick */
+.tool-card .tool-card-results {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .tool-card .tool-card-results.tool-card-collapsed {
-    display: none;
+    grid-template-rows: 0fr;
+}
+
+.tool-card .tool-card-results > * {
+    overflow: hidden;
 }
 
 .tool-card .tool-card-toggle {
     display: inline-block;
     width: 18px;
     font-size: 0.72rem;
-    transition: transform 0.2s;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     color: var(--ink-muted);
 }
 
@@ -1129,15 +1139,18 @@ button:hover {
     display: inline-block;
     width: 16px;
     font-size: 11px;
-    transition: transform 0.2s;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .thinking-label {
     font-weight: 500;
 }
 
+/* Smooth collapse via CSS Grid trick */
 .thinking-text {
-    display: block;
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     color: var(--ink-muted);
     font-size: 14px;
     line-height: 1.7;
@@ -1145,8 +1158,13 @@ button:hover {
     padding: 0;
 }
 
+.thinking-text > * {
+    overflow: hidden;
+    min-height: 0;
+}
+
 .thinking-text.thinking-collapsed {
-    display: none;
+    grid-template-rows: 0fr;
 }
 
 .thinking-divider {
