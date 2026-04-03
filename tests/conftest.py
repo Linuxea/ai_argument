@@ -2,7 +2,10 @@ import pytest
 from unittest.mock import MagicMock
 
 from pydantic_ai import AgentRunResultEvent
-from pydantic_ai.messages import ModelMessage, PartDeltaEvent, TextPartDelta
+from pydantic_ai.messages import (
+    ModelMessage, PartStartEvent, PartDeltaEvent, TextPartDelta,
+    ThinkingPart, ThinkingPartDelta,
+)
 
 
 class _MockRunStreamResult:
@@ -33,11 +36,18 @@ class _MockRunStreamResult:
 class _MockStreamEvents:
     """Mimics the async iterable returned by Agent.run_stream_events()."""
 
-    def __init__(self, text: str):
+    def __init__(self, text: str, thinking: str = ""):
         self._text = text
+        self._thinking = thinking
         self._messages: list[ModelMessage] = []
 
     async def __aiter__(self):
+        # Emit thinking events first, if any
+        if self._thinking:
+            yield PartStartEvent(index=0, part=ThinkingPart(content=self._thinking))
+            yield PartDeltaEvent(index=0, delta=ThinkingPartDelta(content_delta=""))
+
+        # Emit text deltas
         words = self._text.split()
         for i, word in enumerate(words):
             delta = word if i == 0 else " " + word
@@ -51,8 +61,9 @@ class _MockStreamEvents:
 class MockDebateAgent:
     """Mock that replaces both debater_agent and judge_agent for testing."""
 
-    def __init__(self, responses: list[str] = None):
+    def __init__(self, responses: list[str] = None, thinking: list[str] = None):
         self.responses = responses or ["This is a mock response."]
+        self.thinking = thinking or [""] * len(self.responses)
         self.call_count = 0
         self.last_user_prompt = None
         self.last_kwargs = None
@@ -61,8 +72,9 @@ class MockDebateAgent:
         self.last_user_prompt = user_prompt
         self.last_kwargs = kwargs
         response = self.responses[self.call_count % len(self.responses)]
+        thinking = self.thinking[self.call_count % len(self.thinking)]
         self.call_count += 1
-        return _MockStreamEvents(response)
+        return _MockStreamEvents(response, thinking=thinking)
 
     def run_stream(self, user_prompt: str, **kwargs):
         """For judge agent which still uses run_stream()."""
