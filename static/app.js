@@ -403,9 +403,9 @@ class DebateApp {
             if (!data) return;
 
             // Create judge message if not exists
-            if (!this.currentMessageEl || !this.currentMessageEl.dataset.judge) {
+            if (!this.currentMessageContainer || !this.currentMessageContainer.dataset.judge) {
                 this.createMessage('裁判', '#10b981', '⚖️', 'judge');
-                this.currentMessageEl.dataset.judge = 'true';
+                this.currentMessageContainer.dataset.judge = 'true';
             }
 
             this.appendToMessage(data.text_chunk);
