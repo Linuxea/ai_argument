@@ -21,7 +21,7 @@ class Settings:
         self,
         api_base_url: str = "https://api.deepseek.com",
         api_key: str = None,
-        model: str = "deepseek-chat",
+        model: str = "deepseek-reasoner",
     ):
         self.api_base_url = api_base_url
         self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
