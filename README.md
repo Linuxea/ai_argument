@@ -6,9 +6,11 @@ A personal web-based tool where AI debaters with different personas discuss a us
 
 ## Features
 
-- **Multiple AI Debaters**: 3 preset personas (质疑者/乐观派/分析家) + custom debaters
-- **Real-time Streaming**: SSE-based token-by-token message streaming
+- **Multiple AI Debaters**: 3 preset personas (正方/反方/分析家) + custom debaters
+- **Real-time Streaming**: SSE-based token-by-token message streaming with thinking/reasoning display
+- **Web Search**: AI debaters can search the web (via Brave Search) for evidence during debates
 - **User Participation**: Join the debate at any time
+- **Topic Refinement**: AI-powered topic optimization for better debate quality
 - **Judge Mode**: Get an impartial analysis of the debate
 - **OpenAI-Compatible**: Works with any OpenAI-compatible API (DeepSeek, Ollama, vLLM, LM Studio, etc.)
 
@@ -20,13 +22,28 @@ A personal web-based tool where AI debaters with different personas discuss a us
 pip install -r requirements.txt
 ```
 
-### 2. Configure API Key
-
-Set your DeepSeek API key (the default provider):
+Or use the startup script (installs deps and starts server):
 
 ```bash
-export DEEPSEEK_API_KEY="your-api-key-here"
+./start.sh [port]
 ```
+
+### 2. Configure API Key
+
+Create a `.env` file in the project root:
+
+```env
+API_KEY="your-api-key-here"
+```
+
+Full `.env` options:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_BASE_URL` | `https://api.deepseek.com` | OpenAI-compatible API endpoint |
+| `API_KEY` | _(empty)_ | API key for the LLM provider |
+| `MODEL` | `deepseek-reasoner` | Model name to use |
+| `BRAVE_API_KEY` | _(empty)_ | Brave Search API key (optional, enables web search) |
 
 ### 3. Run the Application
 
@@ -48,16 +65,6 @@ Navigate to `http://localhost:8000`
 
 ## Configuration
 
-### API Settings
-
-Configure in the UI sidebar or set environment variables:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| API Base URL | `https://api.deepseek.com` | OpenAI-compatible API endpoint |
-| API Key | from `DEEPSEEK_API_KEY` | API key |
-| Model | `deepseek-chat` | Model name to use |
-
 ### Using with Other Providers
 
 | Provider | Base URL | Notes |
@@ -77,10 +84,18 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Pull a model
 ollama pull llama3
 
-# Then configure in the UI sidebar:
-# API Base URL: http://localhost:11434/v1
-# API Key: ollama
-# Model: llama3
+# Then set in .env:
+# API_BASE_URL=http://localhost:11434/v1
+# API_KEY=ollama
+# MODEL=llama3
+```
+
+### Web Search (Optional)
+
+To enable web search for debaters, get a Brave Search API key from [brave.com/search/api](https://brave.com/search/api/) and add it to your `.env`:
+
+```env
+BRAVE_API_KEY="your-brave-api-key"
 ```
 
 ## Custom Debaters
@@ -90,8 +105,9 @@ Create custom debaters in the UI:
 1. Enter a **Name** (e.g., "实用主义者")
 2. Choose a **Color** (for message styling)
 3. Pick an **Emoji** avatar
-4. Select a **Stance**: 支持 (For), 反对 (Against), or 中立 (Neutral)
-5. Write a **Personality** description
+4. Select a **Stance**: 正方 (For), 反对 (Against), or 中立 (Neutral)
+5. Toggle **Web Search** on/off for this debater
+6. Write a **Personality** description
 
 Example personality:
 ```
@@ -104,18 +120,20 @@ Example personality:
 
 ```
 ai_argument/
-├── main.py              # FastAPI application (routes, SSE)
-├── debate_engine.py     # Core logic (message building, turns)
-├── llm_client.py        # OpenAI-compatible client
+├── main.py              # FastAPI application (routes, SSE, lifespan)
+├── debate_engine.py     # Core logic (state, turns, SSE events)
+├── agents.py            # PydanticAI agent definitions (debater, judge)
+├── tools.py             # Web search tool (Brave Search with rate limiting)
 ├── models.py            # Pydantic data models
-├── config.py            # Settings and preset loading
+├── config.py            # Settings loaded from .env file
 ├── presets.yaml         # Pre-defined debater personas (Chinese)
+├── start.sh             # Startup script (install + run)
 ├── static/
 │   ├── index.html       # Chat UI (Chinese)
 │   ├── style.css        # Dark theme styling
 │   └── app.js           # SSE handling, DOM updates
 ├── tests/               # Unit and integration tests
-└── README.md
+└── .env                 # API configuration (not in repo)
 ```
 
 ## Architecture
@@ -127,7 +145,7 @@ ai_argument/
 │  │ Sidebar  │  │   Chat Area               │  │
 │  │ - Topic  │  │   Messages stream in      │  │
 │  │ - Debaters│  │   real-time via SSE       │  │
-│  │ - Settings│  │                           │  │
+│  │ - Settings│  │   + thinking display      │  │
 │  └─────────┘  └──────────────────────────┘  │
 └──────────────────┬──────────────────────────┘
                    │ SSE stream + REST API
@@ -136,26 +154,59 @@ ai_argument/
 │  ┌────────────┐  ┌────────────────────────┐ │
 │  │ REST API   │  │ Debate Engine          │ │
 │  │ /api/*     │  │ - Turn management      │ │
-│  │            │  │ - Message building     │ │
+│  │            │  │ - PydanticAI agents    │ │
 │  └────────────┘  └────────────────────────┘ │
 │                  ┌────────────────────────┐ │
-│                  │ LLM Client              │ │
-│                  │ (OpenAI-compatible)     │ │
+│                  │ PydanticAI Agents       │ │
+│                  │ - Debater (w/ search)   │ │
+│                  │ - Debater (no search)   │ │
+│                  │ - Judge                 │ │
+│                  └────────────┬───────────┘ │
+│                  ┌────────────▼───────────┐ │
+│                  │ Brave Search API        │ │
+│                  │ (optional web search)   │ │
 │                  └────────────────────────┘ │
 └─────────────────────────────────────────────┘
 ```
 
 ### How AI-to-AI Communication Works
 
-Debaters share a growing conversation history. Each turn:
+The debate engine uses **PydanticAI Agents** for LLM calls. Each debater has its own agent instance with per-turn message history:
 
-1. The engine builds a message array with correct role mapping:
-   - Debater's own past messages → `assistant` role
-   - Other debaters' messages → `user` role with `[Name]:` prefix
-2. The system prompt includes shared debate rules, stance instructions, and the debater's unique personality
+1. The engine builds a user prompt from the debate history:
+   - Other debaters' messages are included as `[Name]: content`
+   - The debater's own messages are excluded (they're already in `message_history` as prior `ModelResponse` entries)
+2. The agent's system prompt includes date context, shared debate rules, stance instructions, personality, and optional search instructions
 3. First-turn debaters receive an opening-statement prompt instead of history
 4. A round countdown is included when `max_rounds` is set
-5. Messages stream back via SSE for real-time display
+5. Messages stream back via SSE, including thinking/reasoning tokens and tool call events
+
+### Web Search in Debates
+
+When `enable_search` is enabled for a debater and `BRAVE_API_KEY` is configured:
+
+- **Round 1**: The debater gathers knowledge — searches the web for facts, statistics, and recent developments
+- **Round 2+**: Conservation mode — relies on gathered knowledge, with rare exception-based searches (max 1/round)
+- Search results are displayed as tool-call cards in the UI
+- A rate limiter (1 req/sec) prevents API abuse
+
+### SSE Events
+
+Event types emitted to `/api/debate/stream`:
+
+| Event | Description |
+|-------|-------------|
+| `debater_start` | A debater begins their turn |
+| `thinking_chunk` | Reasoning/thinking token stream (for models with thinking) |
+| `debater_finalize` | Transition from thinking to response |
+| `debater_chunk` | Response text token stream |
+| `debater_end` | A debater finishes their turn |
+| `tool_call` | Web search executed (with query and result summary) |
+| `round_end` | A debate round completes |
+| `debate_end` | Debate ends (max rounds reached) |
+| `debate_paused` | Debate paused by user |
+| `judge_chunk` | Judge analysis token stream |
+| `judge_result` | Judge analysis complete |
 
 ### Debate Rules (enforced in prompts)
 
@@ -165,6 +216,48 @@ Debaters share a growing conversation history. Each turn:
 - Back up claims with reasoning or examples
 - Rebuttals must advance own argument, not just deny opponents
 - No headers, labels, or numbered sections — speak naturally
+
+## API Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/` | Serve `static/index.html` |
+| GET | `/api/presets` | Return preset debaters |
+| GET | `/api/debaters` | Return presets + custom debaters |
+| POST | `/api/debate/start` | Start debate (2+ debaters required) |
+| GET | `/api/debate/stream` | SSE event stream |
+| POST | `/api/debate/message` | Inject user message |
+| POST | `/api/debate/stop` | Pause debate |
+| POST | `/api/debate/resume` | Resume debate |
+| POST | `/api/debate/judge` | Request judgment (debate must be stopped) |
+| POST | `/api/debaters` | Create custom debater (no duplicate names) |
+| POST | `/api/topic/refine` | AI-powered topic refinement |
+
+## Preset Debaters
+
+Defined in `presets.yaml` with Chinese names and personality descriptions:
+
+| Name | Avatar | Stance | Search | Style |
+|------|--------|--------|--------|-------|
+| 正方 | 🟢 | 正方 | Yes | Passionate advocate, cites success stories and precedents |
+| 反方 | 🔴 | 反方 | Yes | Sharp critic, finds logical flaws and weak evidence |
+| 分析家 | 🔵 | 中立 | No | Data-driven, weighs multiple perspectives, spots false dichotomies |
+
+### Adding a New Preset Debater
+
+Edit `presets.yaml`:
+
+```yaml
+debaters:
+  - name: "实用主义者"
+    color: "#9b59b6"
+    avatar: "🟣"
+    stance: "中立"
+    enable_search: true
+    personality: |
+      你是"实用主义者"——一位注重实际解决方案的思考者。
+      你关注成本、收益和现实世界中的可行性。
+```
 
 ## Running Tests
 
