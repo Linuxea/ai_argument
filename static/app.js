@@ -523,8 +523,21 @@ class DebateApp {
 
     finalizeMessage() {
         if (this.currentMessageEl) {
+            // Preserve thinking elements before re-rendering
+            const thinkingTag = this.currentMessageEl.querySelector('.thinking-tag');
+            const thinkingText = this.currentMessageEl.querySelector('.thinking-text');
+            const thinkingDivider = this.currentMessageEl.querySelector('.thinking-divider');
+            const hasThinking = thinkingText && thinkingText.textContent.trim();
+
             const raw = this.currentMessageEl.dataset.raw || '';
             this.currentMessageEl.innerHTML = this.renderContent(raw);
+
+            // Re-attach thinking elements if they existed and had content
+            if (hasThinking) {
+                this.currentMessageEl.prepend(thinkingDivider);
+                this.currentMessageEl.prepend(thinkingText);
+                this.currentMessageEl.prepend(thinkingTag);
+            }
         }
         this.currentMessageEl = null;
     }
