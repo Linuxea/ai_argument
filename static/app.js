@@ -30,6 +30,8 @@ class DebateApp {
         this._currentDebaterColor = null;
         this._currentDebaterAvatar = null;
         this._lastSpeakerName = null;  // Track last speaker for merging headers
+        this._userScrolledUp = false;
+        this._lastScrollTime = 0;
         this.init();
     }
 
@@ -109,6 +111,14 @@ class DebateApp {
 
         // Judge
         this.judgeBtn.addEventListener('click', () => this.requestJudge());
+
+        // Detect user manual scroll-up
+        this._isAutoScrolling = false;
+        this.messages.addEventListener('scroll', () => {
+            if (this._isAutoScrolling) return;
+            const distFromBottom = this.messages.scrollHeight - this.messages.scrollTop - this.messages.clientHeight;
+            this._userScrolledUp = distFromBottom > 150;
+        });
 
         // Download
         this.downloadBtn.addEventListener('click', () => this.downloadChat());
@@ -590,6 +600,7 @@ class DebateApp {
 
         message.appendChild(content);
         this.messages.appendChild(message);
+        this.scrollToBottom();
     }
 
     addUserMessage(text) {
@@ -731,13 +742,13 @@ class DebateApp {
     }
 
     scrollToBottom() {
-        // Only auto-scroll if user is near the bottom (within 150px).
-        // If they scrolled up to read, don't force them back down.
-        const threshold = 150;
-        const distFromBottom = this.messages.scrollHeight - this.messages.scrollTop - this.messages.clientHeight;
-        if (distFromBottom < threshold) {
-            this.messages.scrollTop = this.messages.scrollHeight;
-        }
+        if (this._userScrolledUp) return;
+        const now = Date.now();
+        if (now - this._lastScrollTime < 800) return;
+        this._lastScrollTime = now;
+        this._isAutoScrolling = true;
+        this.messages.scrollTop = this.messages.scrollHeight;
+        requestAnimationFrame(() => { this._isAutoScrolling = false; });
     }
 
     async stopDebate() {
