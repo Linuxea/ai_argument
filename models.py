@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+
 from pydantic import BaseModel, field_validator
 from typing import Optional, Literal
 
@@ -40,3 +42,10 @@ class CustomDebaterRequest(BaseModel):
 
 class RefineTopicRequest(BaseModel):
     topic: str
+
+
+@dataclass
+class ArgumentSummary:
+    round: int
+    debater_name: str
+    points: list[str] = field(default_factory=list)

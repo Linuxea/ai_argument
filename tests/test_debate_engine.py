@@ -2,7 +2,7 @@
 import pytest
 
 from debate_engine import DebateEngine, DebateState, Message
-from models import Debater
+from models import Debater, ArgumentSummary
 from tests.conftest import MockDebateAgent
 
 
@@ -11,7 +11,6 @@ def _make_engine(responses=None):
     import asyncio
 
     mock = MockDebateAgent(responses=responses)
-    # Create engine without calling __init__ to avoid creating real agents
     engine = object.__new__(DebateEngine)
     engine.model = "test:model"
     engine.base_url = None
@@ -20,6 +19,7 @@ def _make_engine(responses=None):
     engine.debater_agent = mock
     engine.debater_agent_no_search = mock
     engine.judge_agent = MockDebateAgent(responses=responses or ["Judgment."])
+    engine._extractor_agent = MockDebateAgent(responses=['{"points": ["mock claim"]}'])
     engine.state = None
     engine.event_queue = asyncio.Queue()
     engine._loop_task = None
@@ -378,17 +378,19 @@ def test_update_model_recreates_agents():
     old_debater = engine.debater_agent
     old_judge = engine.judge_agent
 
-    # Mock the create_*_agent functions to avoid calling real PydanticAI
     from unittest.mock import patch
 
     with patch("debate_engine.create_debater_agent") as mock_debater_creator, patch(
         "debate_engine.create_debater_agent_no_search"
     ) as mock_no_search_creator, patch(
         "debate_engine.create_judge_agent"
-    ) as mock_judge_creator:
+    ) as mock_judge_creator, patch(
+        "debate_engine.create_extractor_agent"
+    ) as mock_extractor_creator:
         mock_debater_creator.return_value = MockDebateAgent()
         mock_no_search_creator.return_value = MockDebateAgent()
         mock_judge_creator.return_value = MockDebateAgent()
+        mock_extractor_creator.return_value = MockDebateAgent()
 
         engine.update_model("new:model", None, None)
 
@@ -398,6 +400,7 @@ def test_update_model_recreates_agents():
         mock_debater_creator.assert_called_once_with("new:model", None, None)
         mock_no_search_creator.assert_called_once_with("new:model", None, None)
         mock_judge_creator.assert_called_once_with("new:model", None, None)
+        mock_extractor_creator.assert_called_once_with("new:model", None, None)
 
 
 @pytest.mark.asyncio
@@ -490,3 +493,114 @@ async def test_run_turn_no_thinking_events_without_thinking():
 
     event_types = [e.type for e in events]
     assert "thinking_chunk" not in event_types
+
+
+def test_argument_summary_creation():
+    summary = ArgumentSummary(round=1, debater_name="Alice", points=["Claim A", "Claim B"])
+    assert summary.round == 1
+    assert summary.debater_name == "Alice"
+    assert summary.points == ["Claim A", "Claim B"]
+
+
+def test_argument_summary_default_points():
+    summary = ArgumentSummary(round=0, debater_name="Bob")
+    assert summary.points == []
+
+
+@pytest.mark.asyncio
+async def test_extract_key_points_appends_summary():
+    engine, _ = _make_engine()
+    engine._extractor_agent = MockDebateAgent(responses=['{"points": ["Claim A", "Claim B"]}'])
+    debater = Debater(name="Alice", personality="Test.")
+    engine.state = DebateState(topic="Test", debaters=[debater])
+
+    await engine._extract_key_points("Alice", "Some argument text", 1)
+
+    assert len(engine.state.argument_summaries) == 1
+    summary = engine.state.argument_summaries[0]
+    assert summary.round == 1
+    assert summary.debater_name == "Alice"
+    assert summary.points == ["Claim A", "Claim B"]
+
+
+@pytest.mark.asyncio
+async def test_extract_key_points_handles_json_error():
+    engine, _ = _make_engine()
+    engine._extractor_agent = MockDebateAgent(responses=['not valid json'])
+    debater = Debater(name="Alice", personality="Test.")
+    engine.state = DebateState(topic="Test", debaters=[debater])
+
+    await engine._extract_key_points("Alice", "Some text", 1)
+
+    assert len(engine.state.argument_summaries) == 0
+
+
+@pytest.mark.asyncio
+async def test_extract_key_points_handles_empty_points():
+    engine, _ = _make_engine()
+    engine._extractor_agent = MockDebateAgent(responses=['{"points": []}'])
+    debater = Debater(name="Alice", personality="Test.")
+    engine.state = DebateState(topic="Test", debaters=[debater])
+
+    await engine._extract_key_points("Alice", "Some text", 1)
+
+    assert len(engine.state.argument_summaries) == 0
+
+
+def test_build_user_prompt_includes_summaries():
+    engine, _ = _make_engine()
+    skeptic = Debater(name="Skeptic", personality="Be skeptical.")
+    optimist = Debater(name="Optimist", personality="Be optimistic.")
+    engine.state = DebateState(
+        topic="AI in education",
+        debaters=[skeptic, optimist],
+        history=[
+            Message(speaker="Skeptic", content="Teachers need empathy."),
+            Message(speaker="Optimist", content="AI can personalize."),
+        ],
+        argument_summaries=[
+            ArgumentSummary(round=0, debater_name="Skeptic", points=["Teachers need empathy"]),
+            ArgumentSummary(round=0, debater_name="Optimist", points=["AI can personalize learning"]),
+        ],
+    )
+
+    prompt = engine._build_user_prompt(skeptic)
+
+    assert "Key arguments" in prompt
+    assert "Skeptic" in prompt
+    assert "Teachers need empathy" in prompt
+    assert "Optimist" in prompt
+    assert "AI can personalize learning" in prompt
+
+
+def test_build_user_prompt_no_summaries_when_empty():
+    engine, _ = _make_engine()
+    debater = Debater(name="Test", personality="Test.")
+    engine.state = DebateState(
+        topic="Test topic",
+        debaters=[debater],
+        history=[Message(speaker="Other", content="Hello")],
+    )
+
+    prompt = engine._build_user_prompt(debater)
+
+    assert "Key arguments" not in prompt
+
+
+@pytest.mark.asyncio
+async def test_run_turn_calls_extract_key_points():
+    engine, _ = _make_engine(responses=["My argument about AI."])
+    extractor_mock = MockDebateAgent(responses=['{"points": ["AI transforms education"]}'])
+    engine._extractor_agent = extractor_mock
+    debater = Debater(name="Alice", personality="Test.")
+    engine.state = DebateState(topic="Test", debaters=[debater])
+    engine._history = {"Alice": []}
+
+    await engine.run_turn()
+
+    assert extractor_mock.call_count == 1
+    assert extractor_mock.last_user_prompt is not None
+    assert "Alice" in extractor_mock.last_user_prompt
+    assert len(engine.state.argument_summaries) == 1
+    assert engine.state.argument_summaries[0].debater_name == "Alice"
+    assert engine.state.argument_summaries[0].points == ["AI transforms education"]

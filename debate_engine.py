@@ -10,8 +10,8 @@ from pydantic_ai.messages import (
     TextPart, TextPartDelta,
     ThinkingPart, ThinkingPartDelta,
 )
-from models import Debater
-from agents import create_debater_agent, create_debater_agent_no_search, create_judge_agent, DebaterDeps
+from models import Debater, ArgumentSummary
+from agents import create_debater_agent, create_debater_agent_no_search, create_judge_agent, create_extractor_agent, DebaterDeps
 
 
 @dataclass
@@ -34,6 +34,7 @@ class DebateState:
     current_turn_index: int = 0
     history: list[Message] = field(default_factory=list)
     max_rounds: Optional[int] = None
+    argument_summaries: list[ArgumentSummary] = field(default_factory=list)
 
 
 @dataclass
@@ -59,6 +60,7 @@ class DebateEngine:
         self.debater_agent = create_debater_agent(model, base_url, api_key)
         self.debater_agent_no_search = create_debater_agent_no_search(model, base_url, api_key)
         self.judge_agent = create_judge_agent(model, base_url, api_key)
+        self._extractor_agent = create_extractor_agent(model, base_url, api_key)
         self.state: Optional[DebateState] = None
         self.event_queue: asyncio.Queue = asyncio.Queue()
         self._loop_task: Optional[asyncio.Task] = None
@@ -115,6 +117,14 @@ class DebateEngine:
             )
 
         parts = [f"Debate topic: {self.state.topic}"]
+
+        if self.state.argument_summaries:
+            summary_lines = ["[Key arguments raised so far]:"]
+            for s in self.state.argument_summaries:
+                points_text = "; ".join(s.points)
+                summary_lines.append(f"Round {s.round + 1} - {s.debater_name}: {points_text}")
+            parts.append("\n".join(summary_lines))
+
         for msg in self.state.history:
             if msg.speaker == debater.name:
                 continue
@@ -257,6 +267,8 @@ class DebateEngine:
             )
         )
 
+        await self._extract_key_points(debater.name, full_text, self.state.current_round)
+
         self._advance_turn()
 
     def _advance_turn(self):
@@ -321,6 +333,22 @@ class DebateEngine:
             return True
         return False
 
+    async def _extract_key_points(self, debater_name: str, full_text: str, round_number: int):
+        """Extract key claims from a debater's response using the extractor agent."""
+        if not full_text.strip():
+            return
+        try:
+            prompt = f"Speaker: {debater_name}\n\n{full_text}"
+            result = await self._extractor_agent.run(prompt)
+            data = json.loads(result.output)
+            points = data.get("points", [])
+            if points:
+                self.state.argument_summaries.append(
+                    ArgumentSummary(round=round_number, debater_name=debater_name, points=points)
+                )
+        except Exception:
+            pass
+
     async def judge(self) -> bool:
         """Generate a judge's analysis of the debate."""
         if not self.state:
@@ -357,3 +385,4 @@ class DebateEngine:
         self.debater_agent = create_debater_agent(model_name, base_url, api_key)
         self.debater_agent_no_search = create_debater_agent_no_search(model_name, base_url, api_key)
         self.judge_agent = create_judge_agent(model_name, base_url, api_key)
+        self._extractor_agent = create_extractor_agent(model_name, base_url, api_key)

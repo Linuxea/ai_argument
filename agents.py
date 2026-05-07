@@ -112,6 +112,62 @@ Be concise. Cite actual arguments from the debate. Do not let your own opinions 
 topic influence your judgment.\
 """
 
+CONCESSION_INSTRUCTIONS = """\
+## Strategic Concession
+
+A skilled debater knows when to yield ground to gain credibility:
+
+- When an opponent makes a valid point on a **non-core** issue, acknowledge it honestly using the markup: \
+[退让]your acknowledgement here[/退让]
+- After conceding, immediately **reframe** the issue or pivot to a stronger argument — never concede without \
+following up with a stronger position
+- Never concede your **core** position — only peripheral or secondary points
+- Use concessions strategically: they build trust and make your strongest arguments more credible
+- A good concession sounds like: "You raise a fair point about X, but that actually reinforces my argument \
+because Y"
+"""
+
+STRATEGY_INSTRUCTIONS = """\
+## Dynamic Strategy
+
+Before responding, observe your opponent's argumentation style and adapt your counter-strategy:
+
+- If they rely on **data and statistics** → counter with human stories, emotional narratives, and real-world impact
+- If they use **emotional narratives** → counter with rigorous logic, statistics, and systematic analysis
+- If they are **aggressive and combative** → stay calm, measured, and precise — composure beats aggression
+- If they are **cautious and reserved** → seize the initiative, push harder, force engagement
+- If they argue in **abstract terms** → ground the debate in concrete examples and practical consequences
+
+Your adaptation should feel natural and seamless — not mechanical or formulaic. Choose ONE dominant \
+counter-strategy per round.
+"""
+
+MEMORY_INSTRUCTIONS = """\
+## Memory and Citation
+
+Build narrative continuity across rounds:
+
+- **Reference specific arguments** from earlier rounds: "In round 1, [[Name]] claimed X..."
+- **Point out contradictions** if an opponent's position has shifted between rounds
+- **Track unanswered questions**: if you raised a challenge and no one addressed it, raise it again explicitly
+- **Build on allies' arguments**: "As [[Name]] demonstrated earlier..." — strengthen shared positions
+- **Evolve your own arguments** — do not repeat previous points verbatim; deepen and extend them each round
+- Use the "[Key arguments raised so far]" section provided in the conversation to track what has been said
+"""
+
+EXTRACT_POINTS_PROMPT = """\
+You are an argument extraction tool. Extract 2-3 key claims from the debate argument below.
+
+Return ONLY a JSON object with this exact format:
+{"points": ["claim 1", "claim 2", "claim 3"]}
+
+Rules:
+- Each claim should be one concise sentence
+- Extract the strongest, most distinct arguments
+- Do not paraphrase — keep the speaker's intent
+- If fewer than 2 meaningful claims exist, extract whatever is available
+"""
+
 
 @dataclass
 class DebaterDeps:
@@ -179,11 +235,19 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
     )
 
     parts = [
-        date_context,  # Move to FIRST position for maximum visibility
+        date_context,
         DEBATE_RULES,
+    ]
+
+    if ctx.deps.round_number >= 1:
+        parts.append(CONCESSION_INSTRUCTIONS)
+        parts.append(STRATEGY_INSTRUCTIONS)
+        parts.append(MEMORY_INSTRUCTIONS)
+
+    parts.extend([
         f"Your stance: {stance}",
         debater.personality,
-    ]
+    ])
 
     if debater.enable_search:
         parts.append(SEARCH_INSTRUCTIONS)
@@ -220,5 +284,17 @@ def create_judge_agent(model_name: str, base_url: str | None = None, api_key: st
         model,
         output_type=str,
         instructions=JUDGE_PROMPT,
+    )
+    return agent
+
+
+def create_extractor_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[None, str]:
+    """Create a lightweight agent for extracting key argument points."""
+    agent: Agent[None, str] = Agent(
+        _make_model(model_name, base_url, api_key),
+        deps_type=None,
+        output_type=str,
+        instructions=EXTRACT_POINTS_PROMPT,
+        tools=[],
     )
     return agent

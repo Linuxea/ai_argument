@@ -731,10 +731,13 @@ class DebateApp {
             // marked.parse() renders markdown to HTML.
             // Raw HTML in the input is escaped by our custom renderer (see top of file).
             const html = marked.parse(sanitized);
-            // Restore mentions as highlighted badges
-            return html.replace(/%%MENTION_(\d+)%%/g, (_, i) => {
+            let result = html.replace(/%%MENTION_(\d+)%%/g, (_, i) => {
                 return `<span class="mention">${this.escapeHtml(mentions[parseInt(i)])}</span>`;
             });
+            result = result.replace(/\[退让\]([\s\S]*?)\[\/退让\]/g, (_, text) => {
+                return `<span class="concession">${text}</span>`;
+            });
+            return result;
         } catch (err) {
             console.error('marked.parse failed, falling back to escaped text:', err);
             return this.escapeHtml(raw);

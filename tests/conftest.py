@@ -84,6 +84,16 @@ class MockDebateAgent:
         self.call_count += 1
         return _MockRunStreamResult(response)
 
+    async def run(self, user_prompt: str, **kwargs):
+        """For extractor agent which uses Agent.run()."""
+        self.last_user_prompt = user_prompt
+        self.last_kwargs = kwargs
+        response = self.responses[self.call_count % len(self.responses)]
+        self.call_count += 1
+        result = MagicMock()
+        result.output = response
+        return result
+
 
 @pytest.fixture
 def mock_agent():

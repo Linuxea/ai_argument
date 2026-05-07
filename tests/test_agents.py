@@ -6,11 +6,16 @@ from agents import (
     create_debater_agent,
     create_debater_agent_no_search,
     create_judge_agent,
+    create_extractor_agent,
     DebaterDeps,
     DEBATE_RULES,
     STANCE_INSTRUCTIONS,
     JUDGE_PROMPT,
     _build_debater_instructions,
+    CONCESSION_INSTRUCTIONS,
+    STRATEGY_INSTRUCTIONS,
+    MEMORY_INSTRUCTIONS,
+    EXTRACT_POINTS_PROMPT,
 )
 from models import Debater
 
@@ -155,5 +160,90 @@ def test_debater_agent_no_search_has_thinking_enabled():
 def test_judge_agent_does_not_have_thinking_enabled():
     with patch("agents._make_model", return_value=_mock_model()):
         agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
+    settings = agent.model_settings or {}
+    assert settings.get("thinking") is not True
+
+
+def test_concession_instructions_exists():
+    assert isinstance(CONCESSION_INSTRUCTIONS, str)
+    assert len(CONCESSION_INSTRUCTIONS) > 50
+    assert "退让" in CONCESSION_INSTRUCTIONS
+
+
+def test_strategy_instructions_exists():
+    assert isinstance(STRATEGY_INSTRUCTIONS, str)
+    assert len(STRATEGY_INSTRUCTIONS) > 50
+    assert "strategy" in STRATEGY_INSTRUCTIONS.lower()
+
+
+def test_memory_instructions_exists():
+    assert isinstance(MEMORY_INSTRUCTIONS, str)
+    assert len(MEMORY_INSTRUCTIONS) > 50
+    assert "reference" in MEMORY_INSTRUCTIONS.lower() or "earlier" in MEMORY_INSTRUCTIONS.lower()
+
+
+def test_extract_points_prompt_exists():
+    assert isinstance(EXTRACT_POINTS_PROMPT, str)
+    assert "points" in EXTRACT_POINTS_PROMPT.lower()
+    assert "json" in EXTRACT_POINTS_PROMPT.lower()
+
+
+def test_build_debater_instructions_includes_concession_for_round_2():
+    debater = Debater(name="Test", stance="正方", personality="Test.")
+    ctx = MagicMock()
+    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=1, max_rounds=3)
+    instructions = _build_debater_instructions(ctx)
+    assert "退让" in instructions
+
+
+def test_build_debater_instructions_excludes_concession_for_round_0():
+    debater = Debater(name="Test", stance="正方", personality="Test.")
+    ctx = MagicMock()
+    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=0, max_rounds=3)
+    instructions = _build_debater_instructions(ctx)
+    assert "退让" not in instructions
+
+
+def test_build_debater_instructions_includes_strategy_for_round_2():
+    debater = Debater(name="Test", stance="正方", personality="Test.")
+    ctx = MagicMock()
+    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=1, max_rounds=3)
+    instructions = _build_debater_instructions(ctx)
+    assert "Dynamic Strategy" in instructions
+
+
+def test_build_debater_instructions_includes_memory_for_round_2():
+    debater = Debater(name="Test", stance="正方", personality="Test.")
+    ctx = MagicMock()
+    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=2, max_rounds=3)
+    instructions = _build_debater_instructions(ctx)
+    assert "Memory and Citation" in instructions
+
+
+def test_build_debater_instructions_excludes_new_instructions_for_round_0():
+    debater = Debater(name="Test", stance="正方", personality="Test.")
+    ctx = MagicMock()
+    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=0, max_rounds=3)
+    instructions = _build_debater_instructions(ctx)
+    assert "Dynamic Strategy" not in instructions
+    assert "Memory and Citation" not in instructions
+
+
+def test_create_extractor_agent_returns_agent():
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_extractor_agent("deepseek-chat", "https://api.example.com", "test-key")
+    assert agent is not None
+
+
+def test_extractor_agent_has_no_tools():
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_extractor_agent("deepseek-chat", "https://api.example.com", "test-key")
+    tool_names = list(agent._function_toolset.tools.keys())
+    assert len(tool_names) == 0
+
+
+def test_extractor_agent_has_no_thinking():
+    with patch("agents._make_model", return_value=_mock_model()):
+        agent = create_extractor_agent("deepseek-chat", "https://api.example.com", "test-key")
     settings = agent.model_settings or {}
     assert settings.get("thinking") is not True
