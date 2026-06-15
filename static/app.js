@@ -431,6 +431,29 @@ class DebateApp {
             }
         });
 
+        this.eventSource.addEventListener('debate_error', (e) => {
+            const data = this._parseSSEData(e, 'debate_error');
+            this.finalizeMessage();
+            this.debateActive = false;
+            this.debatePaused = false;
+            this.updateUI('stopped');
+            this.addSystemMessage(data?.message || '辩论过程中出错');
+            if (this.eventSource) {
+                this.eventSource.close();
+                this.eventSource = null;
+            }
+        });
+
+        this.eventSource.addEventListener('judge_error', (e) => {
+            const data = this._parseSSEData(e, 'judge_error');
+            this.finalizeMessage();
+            this.addSystemMessage(data?.message || '评判失败');
+            if (this.eventSource) {
+                this.eventSource.close();
+                this.eventSource = null;
+            }
+        });
+
         this.eventSource.onerror = (e) => {
             console.error('SSE error:', e);
             if (this.eventSource) {

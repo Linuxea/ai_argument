@@ -604,3 +604,64 @@ async def test_run_turn_calls_extract_key_points():
     assert len(engine.state.argument_summaries) == 1
     assert engine.state.argument_summaries[0].debater_name == "Alice"
     assert engine.state.argument_summaries[0].points == ["AI transforms education"]
+
+
+# ---------------------------------------------------------------------------
+# Stage 1 contracts: terminal events on failure (no client hang)
+# ---------------------------------------------------------------------------
+
+
+class _ExplodingAgent:
+    """Agent mock whose streaming methods raise, simulating an LLM failure."""
+
+    def __init__(self, exc: Exception):
+        self._exc = exc
+
+    def run_stream_events(self, *_args, **_kwargs):
+        raise self._exc
+
+    def run_stream(self, *_args, **_kwargs):
+        raise self._exc
+
+    async def run(self, *_args, **_kwargs):
+        raise self._exc
+
+
+async def test_run_loop_failure_emits_debate_error():
+    """A failure inside the loop surfaces as a debate_error terminal event."""
+    engine, _ = _make_engine()
+    engine.debater_agent = _ExplodingAgent(RuntimeError("provider down"))
+    engine.debater_agent_no_search = _ExplodingAgent(RuntimeError("provider down"))
+
+    debater = Debater(name="Alice", personality="Test.")
+    engine.state = DebateState(topic="Test", debaters=[debater])
+    engine._history = {"Alice": []}
+
+    await engine._run_loop_and_cleanup()
+
+    assert engine.state.active is False
+    events = []
+    while not engine.event_queue.empty():
+        events.append(await engine.event_queue.get())
+    error_events = [e for e in events if e.type == "debate_error"]
+    assert len(error_events) == 1
+    assert "provider down" in error_events[0].payload["message"]
+
+
+async def test_judge_failure_emits_judge_error():
+    """A failure during judging surfaces as a judge_error terminal event."""
+    engine, _ = _make_engine()
+    engine.judge_agent = _ExplodingAgent(RuntimeError("judge model down"))
+
+    debater = Debater(name="Alice", personality="Test.")
+    engine.state = DebateState(topic="Test", debaters=[debater])
+
+    result = await engine.judge()
+
+    assert result is False
+    events = []
+    while not engine.event_queue.empty():
+        events.append(await engine.event_queue.get())
+    error_events = [e for e in events if e.type == "judge_error"]
+    assert len(error_events) == 1
+    assert "judge model down" in error_events[0].payload["message"]

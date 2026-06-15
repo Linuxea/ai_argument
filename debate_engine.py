@@ -1,10 +1,13 @@
 import asyncio
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
 from pydantic_ai import AgentRunResultEvent, FunctionToolCallEvent, FunctionToolResultEvent
+
+logger = logging.getLogger(__name__)
 from pydantic_ai.messages import (
     ModelMessage, PartStartEvent, PartDeltaEvent,
     TextPart, TextPartDelta,
@@ -97,9 +100,24 @@ class DebateEngine:
             self._loop_task = asyncio.create_task(self._run_loop_and_cleanup())
 
     async def _run_loop_and_cleanup(self):
-        """Run the debate loop and clean up the task reference when done."""
+        """Run the debate loop and clean up the task reference when done.
+
+        Any exception from the loop (e.g. an LLM provider error mid-stream)
+        is captured and surfaced as a ``debate_error`` terminal SSE event so
+        the connected client is never left waiting on keepalives forever.
+        """
         try:
             await self.run_loop()
+        except Exception as exc:
+            logger.exception("Debate loop failed")
+            if self.state:
+                self.state.active = False
+            await self.event_queue.put(
+                Event(
+                    type="debate_error",
+                    payload={"message": f"辩论过程中出错: {exc}"},
+                )
+            )
         finally:
             self._loop_task = None
 
@@ -327,7 +345,15 @@ class DebateEngine:
         return False
 
     def resume(self) -> bool:
-        """Resume a paused debate."""
+        """Resume a paused debate.
+
+        Note: this only flips ``state.active`` back to True. The debate loop
+        task is NOT restarted here — the loop exits when the debate is paused
+        (see ``_run_loop_and_cleanup``). An SSE consumer must reconnect and
+        call ``ensure_loop_running()`` for turns to actually resume. The
+        ``/api/debate/resume`` endpoint signals this requirement back to the
+        client via ``needs_sse_reconnect``.
+        """
         if self.state:
             self.state.active = True
             return True
@@ -347,10 +373,22 @@ class DebateEngine:
                     ArgumentSummary(round=round_number, debater_name=debater_name, points=points)
                 )
         except Exception:
-            pass
+            # Non-fatal: argument summaries enhance cross-round memory but
+            # are not required for the debate to continue. Log so a silent
+            # degradation of the MEMORY_INSTRUCTIONS feature is traceable.
+            logger.warning(
+                "Failed to extract key points for %s (round %d)",
+                debater_name,
+                round_number,
+                exc_info=True,
+            )
 
     async def judge(self) -> bool:
-        """Generate a judge's analysis of the debate."""
+        """Generate a judge's analysis of the debate.
+
+        On failure, emits a ``judge_error`` terminal event so the SSE
+        consumer can terminate instead of hanging on keepalives.
+        """
         if not self.state:
             return False
 
@@ -359,15 +397,25 @@ class DebateEngine:
             transcript += f"[{msg.speaker}]: {msg.content}\n\n"
 
         full_text = ""
-        async with self.judge_agent.run_stream(transcript) as result:
-            async for delta in result.stream_text(delta=True):
-                full_text += delta
-                await self.event_queue.put(
-                    Event(
-                        type="judge_chunk",
-                        payload={"text_chunk": delta},
+        try:
+            async with self.judge_agent.run_stream(transcript) as result:
+                async for delta in result.stream_text(delta=True):
+                    full_text += delta
+                    await self.event_queue.put(
+                        Event(
+                            type="judge_chunk",
+                            payload={"text_chunk": delta},
+                        )
                     )
+        except Exception as exc:
+            logger.exception("Judge generation failed")
+            await self.event_queue.put(
+                Event(
+                    type="judge_error",
+                    payload={"message": f"评判失败: {exc}"},
                 )
+            )
+            return False
 
         await self.event_queue.put(
             Event(

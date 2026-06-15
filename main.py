@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 
 from models import Debater, DebateConfig, UserMessage, CustomDebaterRequest, RefineTopicRequest
 from config import load_presets, settings
-from debate_engine import DebateEngine
+from debate_engine import DebateEngine, Event
 
 BASE_DIR = Path(__file__).parent
 
@@ -124,7 +124,13 @@ async def debate_stream():
                     data = json.dumps(event.payload)
                     yield f"event: {event.type}\ndata: {data}\n\n"
 
-                    if event.type in ("debate_end", "judge_result", "debate_paused"):
+                    if event.type in (
+                        "debate_end",
+                        "judge_result",
+                        "debate_paused",
+                        "debate_error",
+                        "judge_error",
+                    ):
                         break
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
@@ -162,7 +168,7 @@ async def resume_debate():
     if debate_engine and debate_engine.state:
         debate_engine.resume()
         # Loop will be started by SSE endpoint when consumer reconnects
-        return {"status": "resumed"}
+        return {"status": "resumed", "needs_sse_reconnect": True}
     raise HTTPException(status_code=400, detail="No debate to resume")
 
 
@@ -175,8 +181,24 @@ async def judge_debate():
     if debate_engine.state.active:
         raise HTTPException(status_code=400, detail="Please stop the debate before requesting a judgment")
 
-    asyncio.create_task(debate_engine.judge())
+    asyncio.create_task(_safe_judge(debate_engine))
     return {"status": "judging"}
+
+
+async def _safe_judge(engine: "DebateEngine"):
+    """Run judgment with a safety net.
+
+    ``DebateEngine.judge`` already emits a ``judge_error`` terminal event on
+    internal failure, but this wrapper guarantees a terminal event even if the
+    coroutine is cancelled or fails before reaching judge's own try/except —
+    so the SSE consumer never hangs.
+    """
+    try:
+        await engine.judge()
+    except Exception as exc:
+        await engine.event_queue.put(
+            Event(type="judge_error", payload={"message": f"评判失败: {exc}"})
+        )
 
 
 @app.post("/api/debaters")
