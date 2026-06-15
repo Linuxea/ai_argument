@@ -3,17 +3,25 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Literal, Optional
+from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+# Bounded to keep prompts/context windows sane for a single-user tool.
+MAX_TOPIC_LENGTH = 500
+MAX_MESSAGE_LENGTH = 2000
+MAX_PERSONALITY_LENGTH = 1000
+MAX_NAME_LENGTH = 50
+MAX_AVATAR_LENGTH = 10
+MAX_DEBATERS = 20
 
 
 class Debater(BaseModel):
-    name: str
+    name: str = Field(max_length=MAX_NAME_LENGTH)
     color: str = "#333333"
-    avatar: str = "💬"
+    avatar: str = Field(default="💬", max_length=MAX_AVATAR_LENGTH)
     stance: Literal["正方", "反方", "中立"] = "中立"
-    personality: str
+    personality: str = Field(max_length=MAX_PERSONALITY_LENGTH)
     enable_search: bool = True
 
     @field_validator("color")
@@ -25,26 +33,26 @@ class Debater(BaseModel):
 
 
 class DebateConfig(BaseModel):
-    topic: str
-    debater_names: list[str]
+    topic: str = Field(max_length=MAX_TOPIC_LENGTH)
+    debater_names: list[str] = Field(max_length=MAX_DEBATERS)
     max_rounds: int | None = None
 
 
 class UserMessage(BaseModel):
-    message: str
+    message: str = Field(max_length=MAX_MESSAGE_LENGTH)
 
 
 class CustomDebaterRequest(BaseModel):
-    name: str
+    name: str = Field(max_length=MAX_NAME_LENGTH)
     color: str = "#333333"
-    avatar: str = "💬"
+    avatar: str = Field(default="💬", max_length=MAX_AVATAR_LENGTH)
     stance: Literal["正方", "反方", "中立"] = "中立"
-    personality: str
+    personality: str = Field(max_length=MAX_PERSONALITY_LENGTH)
     enable_search: bool = True
 
 
 class RefineTopicRequest(BaseModel):
-    topic: str
+    topic: str = Field(max_length=MAX_TOPIC_LENGTH)
 
 
 @dataclass

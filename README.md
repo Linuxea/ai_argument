@@ -120,13 +120,22 @@ Example personality:
 
 ```
 ai_argument/
-├── main.py              # FastAPI application (routes, SSE, lifespan)
-├── debate_engine.py     # Core logic (state, turns, SSE events)
-├── agents.py            # PydanticAI agent definitions (debater, judge)
-├── tools.py             # Web search tool (Brave Search with rate limiting)
-├── models.py            # Pydantic data models
-├── config.py            # Settings loaded from .env file
-├── presets.yaml         # Pre-defined debater personas (Chinese)
+├── main.py              # Entry point: app = create_app()
+├── app/                 # Application package
+│   ├── __init__.py      # create_app() factory (lifespan, static, routers)
+│   ├── config.py        # Pydantic Settings (from .env) + cached presets
+│   ├── deps.py          # FastAPI Depends providers + DebaterRepository
+│   ├── models.py        # Pydantic models + validation (length caps)
+│   ├── agents.py        # PydanticAI agent definitions + prompt templates
+│   ├── tools.py         # web_search tool (Brave Search, rate-limited)
+│   ├── presets.yaml     # Pre-defined debater personas (Chinese)
+│   ├── engine/
+│   │   ├── state.py     # Message / DebateState / Event dataclasses
+│   │   └── debate.py    # DebateEngine (turns, prompt building, SSE events)
+│   └── routes/
+│       ├── debate.py    # /api/debate/* (start, stream, message, judge...)
+│       ├── debaters.py  # /api/presets, /api/debaters
+│       └── topic.py     # /api/topic/refine
 ├── start.sh             # Startup script (install + run)
 ├── static/
 │   ├── index.html       # Chat UI (Chinese)
@@ -135,6 +144,10 @@ ai_argument/
 ├── tests/               # Unit and integration tests
 └── .env                 # API configuration (not in repo)
 ```
+
+The backend uses **dependency injection** — routes receive the `DebateEngine`
+and `DebaterRepository` via FastAPI `Depends`, reading from `app.state`
+populated at startup. Configuration is validated by **Pydantic Settings**.
 
 ## Architecture
 

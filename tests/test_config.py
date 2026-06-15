@@ -1,6 +1,6 @@
 from dotenv import dotenv_values
 
-from config import load_presets, Settings
+from app.config import load_presets, Settings
 
 # Read the actual .env values once so the settings tests are stable regardless
 # of whether a developer has configured real API keys locally.

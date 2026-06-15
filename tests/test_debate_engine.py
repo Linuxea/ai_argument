@@ -1,8 +1,9 @@
 # tests/test_debate_engine.py
 import pytest
 
-from debate_engine import DebateEngine, DebateState, Message
-from models import Debater, ArgumentSummary
+from app.engine.debate import DebateEngine
+from app.engine.state import DebateState, Message
+from app.models import Debater, ArgumentSummary
 from tests.conftest import MockDebateAgent
 
 

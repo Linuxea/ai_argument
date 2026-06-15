@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from tools import web_search
-from agents import DebaterDeps
-from models import Debater
+from app.tools import web_search
+from app.agents import DebaterDeps
+from app.models import Debater
 
 
 def _make_ctx(api_key: str = "test-key") -> MagicMock:

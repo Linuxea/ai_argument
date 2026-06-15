@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from pydantic_ai.models import Model
-from agents import (
+from app.agents import (
     create_debater_agent,
     create_judge_agent,
     create_extractor_agent,
@@ -16,7 +16,7 @@ from agents import (
     MEMORY_INSTRUCTIONS,
     EXTRACT_POINTS_PROMPT,
 )
-from models import Debater
+from app.models import Debater
 
 
 def _mock_model():
@@ -25,13 +25,13 @@ def _mock_model():
 
 
 def test_create_debater_agent_returns_agent():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key")
     assert agent is not None
 
 
 def test_create_judge_agent_returns_agent():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
     assert agent is not None
 
@@ -131,40 +131,40 @@ def test_debater_deps_brave_api_key_defaults_none():
 
 
 def test_debater_agent_has_web_search_tool():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key")
     tool_names = list(agent._function_toolset.tools.keys())
     assert "web_search" in tool_names
 
 
 def test_judge_agent_has_no_web_search_tool():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
     tool_names = list(agent._function_toolset.tools.keys())
     assert "web_search" not in tool_names
 
 
 def test_debater_agent_has_thinking_enabled():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key")
     assert agent.model_settings.get("thinking") is True
 
 
 def test_debater_agent_no_search_has_thinking_enabled():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key", enable_search=False)
     assert agent.model_settings.get("thinking") is True
 
 
 def test_debater_agent_without_search_has_no_web_search_tool():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key", enable_search=False)
     tool_names = list(agent._function_toolset.tools.keys())
     assert "web_search" not in tool_names
 
 
 def test_judge_agent_does_not_have_thinking_enabled():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
     settings = agent.model_settings or {}
     assert settings.get("thinking") is not True
@@ -236,20 +236,20 @@ def test_build_debater_instructions_excludes_new_instructions_for_round_0():
 
 
 def test_create_extractor_agent_returns_agent():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_extractor_agent("deepseek-chat", "https://api.example.com", "test-key")
     assert agent is not None
 
 
 def test_extractor_agent_has_no_tools():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_extractor_agent("deepseek-chat", "https://api.example.com", "test-key")
     tool_names = list(agent._function_toolset.tools.keys())
     assert len(tool_names) == 0
 
 
 def test_extractor_agent_has_no_thinking():
-    with patch("agents._make_model", return_value=_mock_model()):
+    with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_extractor_agent("deepseek-chat", "https://api.example.com", "test-key")
     settings = agent.model_settings or {}
     assert settings.get("thinking") is not True
