@@ -4,4 +4,5 @@ asyncio_mode = "auto"
 filterwarnings = [
     # pydantic-ai renamed OpenAIModel -> OpenAIChatModel; silence until we migrate.
     "ignore::DeprecationWarning:agents",
+    "ignore::DeprecationWarning:app.agents",
 ]

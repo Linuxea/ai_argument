@@ -40,7 +40,7 @@ async def test_web_search_returns_results():
     }
     mock_response.raise_for_status = MagicMock()
 
-    with patch("tools.httpx.AsyncClient") as mock_client:
+    with patch("app.tools.httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()
         mock_instance.get.return_value = mock_response
         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
@@ -62,7 +62,7 @@ async def test_web_search_returns_no_results():
     mock_response.json.return_value = {"web": {"results": []}}
     mock_response.raise_for_status = MagicMock()
 
-    with patch("tools.httpx.AsyncClient") as mock_client:
+    with patch("app.tools.httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()
         mock_instance.get.return_value = mock_response
         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
@@ -80,7 +80,7 @@ async def test_web_search_handles_api_error():
 
     import httpx
 
-    with patch("tools.httpx.AsyncClient") as mock_client:
+    with patch("app.tools.httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()
         mock_instance.get.side_effect = httpx.HTTPStatusError(
             "Rate limited",
@@ -109,7 +109,7 @@ async def test_web_search_truncates_long_results():
     mock_response.json.return_value = {"web": {"results": long_results}}
     mock_response.raise_for_status = MagicMock()
 
-    with patch("tools.httpx.AsyncClient") as mock_client:
+    with patch("app.tools.httpx.AsyncClient") as mock_client:
         mock_instance = AsyncMock()
         mock_instance.get.return_value = mock_response
         mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)

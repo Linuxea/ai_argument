@@ -17,16 +17,17 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 
-from config import load_presets, settings
-from debate_engine import DebateEngine, Event
-from models import (
+from app.config import load_presets, settings
+from app.deps import DebaterRepository
+from app.engine.debate import DebateEngine
+from app.engine.state import Event
+from app.models import (
     CustomDebaterRequest,
     DebateConfig,
     Debater,
     RefineTopicRequest,
     UserMessage,
 )
-from app.deps import DebaterRepository
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

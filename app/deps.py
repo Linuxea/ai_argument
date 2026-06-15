@@ -11,9 +11,9 @@ import asyncio
 
 from fastapi import Request
 
-from config import Settings, load_presets, settings
-from debate_engine import DebateEngine
-from models import Debater
+from app.config import Settings, load_presets, settings
+from app.engine.debate import DebateEngine
+from app.models import Debater
 
 
 class DebaterRepository:
