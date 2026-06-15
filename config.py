@@ -1,31 +1,45 @@
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from dotenv import dotenv_values
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from models import Debater
 
-PRESETS_PATH = Path(__file__).parent / "presets.yaml"
-
-# Load .env file — returns a dict without touching os.environ
-_env = dotenv_values(Path(__file__).parent / ".env")
+BASE_DIR = Path(__file__).parent
+PRESETS_PATH = BASE_DIR / "presets.yaml"
 
 
+class Settings(BaseSettings):
+    """Application settings, loaded from a ``.env`` file.
+
+    Mirrors the keys consumers relied on via the previous hand-rolled
+    ``Settings`` class (``settings.api_base_url`` etc.) but with Pydantic
+    validation and defaults baked into the field metadata.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=str(BASE_DIR / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    api_base_url: str = "https://api.deepseek.com"
+    api_key: str = ""
+    model: str = "deepseek-reasoner"
+    brave_api_key: str = ""
+
+
+@lru_cache(maxsize=1)
 def load_presets() -> list[Debater]:
-    """Load preset debaters from YAML file."""
+    """Load preset debaters from YAML, cached after the first call.
+
+    ``presets.yaml`` is static, so the parsed result is memoised to avoid
+    re-reading and re-parsing the file on every request.
+    """
     with open(PRESETS_PATH) as f:
-        data = yaml.safe_load(f)
-    return [Debater(**d) for d in data["debaters"]]
-
-
-class Settings:
-    """Application settings loaded exclusively from .env file."""
-
-    def __init__(self):
-        self.api_base_url = _env.get("API_BASE_URL", "https://api.deepseek.com")
-        self.api_key = _env.get("API_KEY", "")
-        self.model = _env.get("MODEL", "deepseek-reasoner")
-        self.brave_api_key = _env.get("BRAVE_API_KEY", "")
+        data = yaml.safe_load(f) or {}
+    return [Debater(**d) for d in data.get("debaters", [])]
 
 
 # Global settings instance
