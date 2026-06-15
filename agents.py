@@ -188,29 +188,29 @@ def _make_model(model_name: str, base_url: str | None = None, api_key: str | Non
     return OpenAIModel(model_name, provider=provider)
 
 
-def create_debater_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[DebaterDeps, str]:
-    """Create a PydanticAI Agent with web search capability."""
-    from tools import web_search
+def create_debater_agent(
+    model_name: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    *,
+    enable_search: bool = True,
+) -> Agent[DebaterDeps, str]:
+    """Create a PydanticAI debater Agent.
+
+    ``enable_search`` controls whether the ``web_search`` tool is registered.
+    Thinking/reasoning is always enabled for debaters.
+    """
+    tools = []
+    if enable_search:
+        from tools import web_search
+        tools.append(web_search)
 
     agent: Agent[DebaterDeps, str] = Agent(
         _make_model(model_name, base_url, api_key),
         deps_type=DebaterDeps,
         output_type=str,
         instructions=_build_debater_instructions,
-        tools=[web_search],
-        model_settings={'thinking': True},
-    )
-    return agent
-
-
-def create_debater_agent_no_search(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[DebaterDeps, str]:
-    """Create a PydanticAI Agent without web search."""
-    agent: Agent[DebaterDeps, str] = Agent(
-        _make_model(model_name, base_url, api_key),
-        deps_type=DebaterDeps,
-        output_type=str,
-        instructions=_build_debater_instructions,
-        tools=[],
+        tools=tools,
         model_settings={'thinking': True},
     )
     return agent
@@ -274,14 +274,8 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
 
 def create_judge_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[None, str]:
     """Create a PydanticAI Agent configured for debate judging."""
-    from pydantic_ai.models.openai import OpenAIModel
-    from pydantic_ai.providers.openai import OpenAIProvider
-
-    provider = OpenAIProvider(base_url=base_url, api_key=api_key)
-    model = OpenAIModel(model_name, provider=provider)
-
     agent: Agent[None, str] = Agent(
-        model,
+        _make_model(model_name, base_url, api_key),
         output_type=str,
         instructions=JUDGE_PROMPT,
     )

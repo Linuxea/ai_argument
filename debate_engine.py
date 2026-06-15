@@ -14,7 +14,7 @@ from pydantic_ai.messages import (
     ThinkingPart, ThinkingPartDelta,
 )
 from models import Debater, ArgumentSummary
-from agents import create_debater_agent, create_debater_agent_no_search, create_judge_agent, create_extractor_agent, DebaterDeps
+from agents import create_debater_agent, create_judge_agent, create_extractor_agent, DebaterDeps
 
 
 @dataclass
@@ -60,8 +60,8 @@ class DebateEngine:
         self.base_url = base_url
         self.api_key = api_key
         self.brave_api_key = brave_api_key
-        self.debater_agent = create_debater_agent(model, base_url, api_key)
-        self.debater_agent_no_search = create_debater_agent_no_search(model, base_url, api_key)
+        self.debater_agent = create_debater_agent(model, base_url, api_key, enable_search=True)
+        self.debater_agent_no_search = create_debater_agent(model, base_url, api_key, enable_search=False)
         self.judge_agent = create_judge_agent(model, base_url, api_key)
         self._extractor_agent = create_extractor_agent(model, base_url, api_key)
         self.state: Optional[DebateState] = None
@@ -195,9 +195,7 @@ class DebateEngine:
         ):
             # Handle PartStartEvent — TextPart
             if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
-                if _thinking_active:
-                    _thinking_active = False
-                    await self.event_queue.put(Event(type="debater_finalize", payload={}))
+                _thinking_active = await self._end_thinking(_thinking_active)
                 initial_content = event.part.content
                 if initial_content:
                     full_text += initial_content
@@ -220,9 +218,7 @@ class DebateEngine:
                         payload={"debater_name": debater.name, "text_chunk": initial},
                     ))
             elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
-                if _thinking_active:
-                    _thinking_active = False
-                    await self.event_queue.put(Event(type="debater_finalize", payload={}))
+                _thinking_active = await self._end_thinking(_thinking_active)
                 delta = event.delta.content_delta
                 full_text += delta
                 await self.event_queue.put(
@@ -267,8 +263,7 @@ class DebateEngine:
                 result_all_messages = event.result.all_messages()
 
         # If thinking was the last thing streamed, finalize it
-        if _thinking_active:
-            await self.event_queue.put(Event(type="debater_finalize", payload={}))
+        _thinking_active = await self._end_thinking(_thinking_active)
 
         # Update this debater's message history
         if result_all_messages is not None:
@@ -296,6 +291,17 @@ class DebateEngine:
         if self.state.current_turn_index >= len(self.state.debaters):
             self.state.current_turn_index = 0
             self.state.current_round += 1
+
+    async def _end_thinking(self, thinking_active: bool) -> bool:
+        """Transition out of thinking mode if active.
+
+        Emits a ``debater_finalize`` event when leaving thinking, and returns
+        the new (always False) thinking state. Centralises the
+        thinking→response transition that previously was copy-pasted inline.
+        """
+        if thinking_active:
+            await self.event_queue.put(Event(type="debater_finalize", payload={}))
+        return False
 
     async def run_loop(self):
         """Run the debate loop until stopped or max rounds reached."""
@@ -424,13 +430,3 @@ class DebateEngine:
             )
         )
         return True
-
-    def update_model(self, model_name: str, base_url: str | None = None, api_key: str | None = None):
-        """Recreate agents when API settings change."""
-        self.model = model_name
-        self.base_url = base_url
-        self.api_key = api_key
-        self.debater_agent = create_debater_agent(model_name, base_url, api_key)
-        self.debater_agent_no_search = create_debater_agent_no_search(model_name, base_url, api_key)
-        self.judge_agent = create_judge_agent(model_name, base_url, api_key)
-        self._extractor_agent = create_extractor_agent(model_name, base_url, api_key)

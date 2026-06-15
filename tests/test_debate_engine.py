@@ -372,37 +372,6 @@ async def test_judge_emits_correct_events():
     assert "The winner is..." in judge_result.payload["judgment_text"]
 
 
-def test_update_model_recreates_agents():
-    engine, _ = _make_engine()
-
-    old_debater = engine.debater_agent
-    old_judge = engine.judge_agent
-
-    from unittest.mock import patch
-
-    with patch("debate_engine.create_debater_agent") as mock_debater_creator, patch(
-        "debate_engine.create_debater_agent_no_search"
-    ) as mock_no_search_creator, patch(
-        "debate_engine.create_judge_agent"
-    ) as mock_judge_creator, patch(
-        "debate_engine.create_extractor_agent"
-    ) as mock_extractor_creator:
-        mock_debater_creator.return_value = MockDebateAgent()
-        mock_no_search_creator.return_value = MockDebateAgent()
-        mock_judge_creator.return_value = MockDebateAgent()
-        mock_extractor_creator.return_value = MockDebateAgent()
-
-        engine.update_model("new:model", None, None)
-
-        assert engine.model == "new:model"
-        assert engine.debater_agent is not old_debater
-        assert engine.judge_agent is not old_judge
-        mock_debater_creator.assert_called_once_with("new:model", None, None)
-        mock_no_search_creator.assert_called_once_with("new:model", None, None)
-        mock_judge_creator.assert_called_once_with("new:model", None, None)
-        mock_extractor_creator.assert_called_once_with("new:model", None, None)
-
-
 @pytest.mark.asyncio
 async def test_run_turn_passes_brave_api_key_in_deps():
     engine, mock = _make_engine(responses=["I searched and found..."])

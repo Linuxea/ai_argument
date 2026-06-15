@@ -1,6 +1,6 @@
 from dotenv import dotenv_values
 
-from config import load_presets, Settings, build_model_string
+from config import load_presets, Settings
 
 # Read the actual .env values once so the settings tests are stable regardless
 # of whether a developer has configured real API keys locally.
@@ -22,18 +22,3 @@ def test_settings_defaults():
     assert settings.model == _env.get("MODEL", "deepseek-chat")
     assert settings.api_key == _env.get("API_KEY", "")
     assert settings.brave_api_key == _env.get("BRAVE_API_KEY", "")
-
-
-def test_build_model_string_deepseek():
-    result = build_model_string("https://api.deepseek.com", "deepseek-chat")
-    assert result == "deepseek:deepseek-chat"
-
-
-def test_build_model_string_openai():
-    result = build_model_string("https://api.openai.com/v1", "gpt-4o")
-    assert result == "openai:gpt-4o"
-
-
-def test_build_model_string_unknown_provider():
-    result = build_model_string("https://my-custom-api.com/v1", "my-model")
-    assert result == "openai:my-model"
