@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from app.config import Settings, load_presets, settings
 from app.engine.debate import DebateEngine
@@ -58,8 +58,15 @@ def get_settings() -> Settings:
 
 
 def get_engine(request: Request) -> DebateEngine:
-    """Return the debate engine attached to app.state at startup."""
-    return request.app.state.engine
+    """Return the debate engine attached to app.state at startup.
+
+    Raises HTTPException(400) if the engine hasn't been initialised (e.g. when
+    lifespan hasn't run), so every debate route is uniformly guarded.
+    """
+    engine: DebateEngine | None = request.app.state.engine
+    if engine is None:
+        raise HTTPException(status_code=400, detail="Service not ready")
+    return engine
 
 
 def get_debater_repository(request: Request) -> DebaterRepository:
