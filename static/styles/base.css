@@ -1,0 +1,133 @@
+/* ═══════════════════════════════════════════════════════
+   Base — reset, document defaults, focus, scrollbar
+   ═══════════════════════════════════════════════════════ */
+
+@layer base {
+    *, *::before, *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    html {
+        font-size: 16px;
+        scroll-behavior: smooth;
+        text-size-adjust: 100%;
+    }
+
+    body {
+        font-family: var(--font-body);
+        background: var(--bg-base);
+        color: var(--ink);
+        line-height: var(--leading-base);
+        height: 100vh;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        transition: background-color var(--duration-base) var(--ease-in-out),
+                    color var(--duration-base) var(--ease-in-out);
+    }
+
+    /* Universal focus ring for keyboard navigation */
+    :focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
+        border-radius: var(--radius-xs);
+    }
+
+    button:focus-visible {
+        outline-offset: 3px;
+    }
+
+    a {
+        color: var(--gold-dim);
+        text-decoration: none;
+        border-bottom: 1px dashed var(--gold-dim);
+        transition: color var(--duration-fast) var(--ease-out);
+    }
+
+    a:hover {
+        color: var(--gold);
+        border-bottom-style: solid;
+    }
+
+    code {
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+        background: var(--bg-input);
+        padding: 1px 5px;
+        border-radius: var(--radius-xs);
+    }
+
+    pre {
+        font-family: var(--font-mono);
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: var(--space-3) var(--space-4);
+        overflow-x: auto;
+        font-size: 0.85rem;
+        line-height: 1.55;
+    }
+
+    pre code {
+        background: transparent;
+        padding: 0;
+    }
+
+    img, svg {
+        max-width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    /* Lucide icon defaults */
+    .icon {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+        stroke-width: 1.75;
+        fill: none;
+        flex-shrink: 0;
+        vertical-align: -0.125em;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: var(--radius-full);
+        border: 2px solid transparent;
+        background-clip: padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--border-hover);
+        background-clip: padding-box;
+        border: 2px solid transparent;
+    }
+
+    /* Selection */
+    ::selection {
+        background: var(--gold-glow);
+        color: var(--ink);
+    }
+
+    /* Visually hidden but accessible to screen readers */
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+}

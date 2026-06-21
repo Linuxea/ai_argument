@@ -1,64 +1,70 @@
-// Configure marked.js for safe rendering — disable raw HTML in markdown
-marked.setOptions({
-    breaks: true,
-    gfm: true,
-    headerIds: false,
-    mangle: false,
-});
+// app.js — entry module for The Salon AI debate chatroom
+import { api } from './modules/api.js';
+import { toast } from './modules/toast.js';
+import { initTheme, toggleTheme, isDark } from './modules/theme.js';
+import { renderMarkdown } from './modules/markdown.js';
+import { escapeHtml, debounce, refreshIcons, formatTime } from './modules/utils.js';
+import { SSEClient } from './modules/sse.js';
+import { UIState } from './modules/state.js';
+import { AutoScroller } from './modules/autoscroll.js';
+import { MessageRenderer } from './modules/renderer.js';
+import { DebaterList } from './modules/debaters.js';
+import { SearchPanel } from './modules/search.js';
 
-// Escape all raw HTML that appears in markdown input.
-// In marked.js the renderer method for raw HTML tokens is called "html"
-// (it handles both block-level and inline HTML). By overriding it to
-// escape the text we neutralise any XSS payload the LLM might emit.
-marked.use({
-    renderer: {
-        html({ text }) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        },
-    },
-});
+const STORAGE_MAX_ROUNDS = 'max_rounds';
 
 class DebateApp {
     constructor() {
-        this.eventSource = null;
-        this.currentMessageEl = null;
-        this.debateActive = false;
-        this.debatePaused = false;
-        this._currentDebaterName = null;
-        this._currentDebaterColor = null;
-        this._currentDebaterAvatar = null;
-        this._lastSpeakerName = null;  // Track last speaker for merging headers
-        this._userScrolledUp = false;
-        this._lastScrollTime = 0;
+        this.sse = null;
+        this.maxRounds = 10;
+        this.totalRounds = 10;
+        this.currentRound = 0;
+        this.currentSpeaker = null;
         this.init();
     }
 
     async init() {
-        this.initTheme();
-        this.bindElements();
-        this.bindEventListeners();
-        const maxRounds = localStorage.getItem('max_rounds');
-        if (maxRounds) this.maxRoundsInput.value = maxRounds;
-        await this.loadDebaters();
+        this._bindElements();
+        initTheme((dark) => this._updateThemeIcon(dark));
+        this._bindEvents();
+
+        this.scroller = new AutoScroller(this.messages);
+        this.renderer = new MessageRenderer(this.messages, this.scroller);
+        this.debaterList = new DebaterList(this.debaterListEl);
+        this.search = new SearchPanel({
+            dialog: this.searchDialog,
+            input: this.searchInput,
+            results: this.searchResults,
+            openBtn: this.searchToggleBtn,
+            messagesContainer: this.messages,
+        });
+
+        this.state = new UIState('idle', (s) => this._applyUIState(s));
+
+        // Restore preferences
+        const stored = localStorage.getItem(STORAGE_MAX_ROUNDS);
+        if (stored && parseInt(stored, 10) > 0) {
+            this.maxRoundsInput.value = stored;
+        }
+        this.maxRounds = parseInt(this.maxRoundsInput.value, 10) || 10;
+
+        await this._loadDebaters();
+        this._applyUIState('idle');
+        this.renderer.showEmptyState({ onSuggest: (s) => this._useSuggestion(s) });
+        refreshIcons();
     }
 
-    bindElements() {
-        // Topic input
+    _bindElements() {
+        // Sidebar
         this.topicInput = document.getElementById('topic-input');
         this.maxRoundsInput = document.getElementById('max-rounds');
         this.refineTopicBtn = document.getElementById('refine-topic-btn');
-
-        // Debater list
-        this.debaterList = document.getElementById('debater-list');
-
-        // Control buttons
+        this.debaterListEl = document.getElementById('debater-list');
         this.startBtn = document.getElementById('start-btn');
         this.stopBtn = document.getElementById('stop-btn');
         this.resumeBtn = document.getElementById('resume-btn');
 
-        // Custom debater
+        // Custom debater form
         this.customName = document.getElementById('custom-name');
         this.customColor = document.getElementById('custom-color');
         this.customAvatar = document.getElementById('custom-avatar');
@@ -66,1150 +72,537 @@ class DebateApp {
         this.customPersonality = document.getElementById('custom-personality');
         this.addDebaterBtn = document.getElementById('add-debater-btn');
 
-        // Chat area
+        // Chat
         this.chatTitle = document.getElementById('chat-title');
         this.messages = document.getElementById('messages');
         this.userInput = document.getElementById('user-input');
         this.sendBtn = document.getElementById('send-btn');
         this.judgeBtn = document.getElementById('judge-btn');
         this.downloadBtn = document.getElementById('download-btn');
-
-        // Unhide judge button (starts hidden in HTML)
-        if (this.judgeBtn) this.judgeBtn.removeAttribute('hidden');
-
-        // Theme
         this.themeToggle = document.getElementById('theme-toggle');
 
-        // Search tool
+        // Round progress
+        this.roundProgress = document.getElementById('round-progress');
+        this.roundProgressFill = document.getElementById('round-progress-fill');
+        this.roundInfo = document.getElementById('round-info');
+        this.currentSpeakerEl = document.getElementById('current-speaker');
+        this.roundBadgeEl = document.getElementById('round-badge');
+
+        // Search
         this.searchToggleBtn = document.getElementById('search-toggle-btn');
-        this.searchDrawer = document.getElementById('search-drawer');
-        this.searchBackdrop = document.getElementById('search-backdrop');
-        this.searchClose = document.getElementById('search-close');
+        this.searchDialog = document.getElementById('search-dialog');
         this.searchInput = document.getElementById('search-input');
         this.searchResults = document.getElementById('search-results');
-        this._searchDebounceTimer = null;
-        this._messageIndex = [];
+        this.searchCloseBtn = document.getElementById('search-close');
+
+        // Connection indicator
+        this.connectionIndicator = document.getElementById('connection-indicator');
     }
 
-    bindEventListeners() {
-        // Control buttons
-        this.startBtn.addEventListener('click', () => this.startDebate());
-        this.stopBtn.addEventListener('click', () => this.stopDebate());
-        this.resumeBtn.addEventListener('click', () => this.resumeDebate());
+    _bindEvents() {
+        this.startBtn.addEventListener('click', () => this._startDebate());
+        this.stopBtn.addEventListener('click', () => this._stopDebate());
+        this.resumeBtn.addEventListener('click', () => this._resumeDebate());
+        this.refineTopicBtn.addEventListener('click', () => this._refineTopic());
+        this.addDebaterBtn.addEventListener('click', () => this._addCustomDebater());
+        this.sendBtn.addEventListener('click', () => this._sendUserMessage());
+        this.judgeBtn.addEventListener('click', () => this._requestJudge());
+        this.downloadBtn.addEventListener('click', () => this._downloadChat());
+        this.themeToggle.addEventListener('click', (e) => toggleTheme(e));
+        this.searchCloseBtn?.addEventListener('click', () => this.search.close());
 
-        // Topic refinement
-        this.refineTopicBtn.addEventListener('click', () => this.refineTopic());
+        // Auto-grow textarea + Enter to send
+        this.userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this._sendUserMessage();
+            }
+        });
+        const autoGrow = () => {
+            this.userInput.style.height = 'auto';
+            this.userInput.style.height = Math.min(this.userInput.scrollHeight, 160) + 'px';
+        };
+        this.userInput.addEventListener('input', autoGrow);
 
-        // Custom debater
-        this.addDebaterBtn.addEventListener('click', () => this.addCustomDebater());
-
-        // User message
-        this.sendBtn.addEventListener('click', () => this.sendUserMessage());
-        this.userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendUserMessage();
+        // Persist max rounds
+        this.maxRoundsInput.addEventListener('change', () => {
+            const v = parseInt(this.maxRoundsInput.value, 10);
+            if (v > 0 && v <= 50) {
+                localStorage.setItem(STORAGE_MAX_ROUNDS, String(v));
+                this.maxRounds = v;
+            }
         });
 
-        // Judge
-        this.judgeBtn.addEventListener('click', () => this.requestJudge());
-
-        // Detect user manual scroll-up
-        this._isAutoScrolling = false;
-        this.messages.addEventListener('scroll', () => {
-            if (this._isAutoScrolling) return;
-            const distFromBottom = this.messages.scrollHeight - this.messages.scrollTop - this.messages.clientHeight;
-            this._userScrolledUp = distFromBottom > 150;
-        });
-
-        // Download
-        this.downloadBtn.addEventListener('click', () => this.downloadChat());
-
-        // Theme
-        this.themeToggle.addEventListener('click', () => this.toggleTheme());
-
-        // Search tool
-        this.searchToggleBtn.addEventListener('click', () => this.openSearchDrawer());
-        this.searchClose.addEventListener('click', () => this.closeSearchDrawer());
-        this.searchBackdrop.addEventListener('click', () => this.closeSearchDrawer());
-        this.searchInput.addEventListener('input', () => this.handleSearch());
-
-        // Global ESC handler for search
+        // Global keybinds
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                if (this.searchDrawer.classList.contains('open')) {
-                    this.closeSearchDrawer();
-                }
+            // Cmd/Ctrl+K → search
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                this.search.open();
+            }
+        });
+
+        // Topic Ctrl+Enter to start
+        this.topicInput.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault();
+                if (!this.startBtn.disabled) this._startDebate();
             }
         });
     }
 
-    async loadDebaters() {
+    async _loadDebaters() {
         try {
-            const response = await fetch('/api/debaters');
-            const debaters = await response.json();
-            this.renderDebaters(debaters);
-        } catch (error) {
-            console.error('Failed to load debaters:', error);
+            const debaters = await api.loadDebaters();
+            this.debaterList.setDebaters(debaters);
+        } catch (err) {
+            console.error('Failed to load debaters:', err);
+            toast.error(`加载辩手失败: ${err.message}`);
         }
     }
 
-    renderDebaters(debaters) {
-        this.debaterList.innerHTML = '';
-        this._draggedItem = null;
-
-        debaters.forEach(debater => {
-            const item = document.createElement('div');
-            item.className = 'debater-item';
-            item.draggable = true;
-
-            const handle = document.createElement('span');
-            handle.className = 'drag-handle';
-            handle.textContent = '⠿';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = `debater-${CSS.escape(debater.name)}`;
-            checkbox.value = debater.name;
-            checkbox.checked = true;
-
-            const avatar = document.createElement('span');
-            avatar.className = 'debater-avatar';
-            avatar.textContent = debater.avatar;
-
-            const name = document.createElement('span');
-            name.className = 'debater-name';
-            name.textContent = debater.name;
-
-            const stance = document.createElement('span');
-            stance.className = 'debater-stance';
-            stance.style.color = this.sanitizeColor(debater.color);
-            stance.textContent = debater.stance;
-
-            item.appendChild(handle);
-            item.appendChild(checkbox);
-            item.appendChild(avatar);
-            item.appendChild(name);
-            item.appendChild(stance);
-            this.debaterList.appendChild(item);
-
-            // Drag-and-drop: reorder debaters to control turn order
-            item.addEventListener('dragstart', () => {
-                this._draggedItem = item;
-                item.classList.add('dragging');
-            });
-            item.addEventListener('dragend', () => {
-                item.classList.remove('dragging');
-                this._clearDragOver();
-                this._draggedItem = null;
-            });
-            item.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                if (!this._draggedItem || this._draggedItem === item) return;
-                this._clearDragOver();
-                const rect = item.getBoundingClientRect();
-                const mid = rect.top + rect.height / 2;
-                if (e.clientY < mid) {
-                    item.classList.add('drag-over-top');
-                } else {
-                    item.classList.add('drag-over-bottom');
-                }
-            });
-            item.addEventListener('drop', (e) => {
-                e.preventDefault();
-                if (!this._draggedItem || this._draggedItem === item) return;
-                const rect = item.getBoundingClientRect();
-                const mid = rect.top + rect.height / 2;
-                if (e.clientY < mid) {
-                    this.debaterList.insertBefore(this._draggedItem, item);
-                } else {
-                    this.debaterList.insertBefore(this._draggedItem, item.nextSibling);
-                }
-                this._clearDragOver();
-            });
-        });
+    _useSuggestion(topic) {
+        this.topicInput.value = topic;
+        this.topicInput.focus();
     }
 
-    async refineTopic() {
+    async _refineTopic() {
         const topic = this.topicInput.value.trim();
         if (!topic) {
-            alert('请先输入辩论主题');
+            toast.warn('请先输入辩论主题');
             return;
         }
-
-        // Show loading state
-        const originalText = this.refineTopicBtn.textContent;
+        const original = this.refineTopicBtn.innerHTML;
         this.refineTopicBtn.disabled = true;
-        this.refineTopicBtn.textContent = '优化中...';
-
+        this.refineTopicBtn.textContent = '优化中…';
         try {
-            const response = await fetch('/api/topic/refine', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ topic })
-            });
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || '话题优化失败');
-            }
-
-            const data = await response.json();
+            const data = await api.refineTopic(topic);
             this.topicInput.value = data.refined_topic;
-
-        } catch (error) {
-            console.error('Failed to refine topic:', error);
-            alert(error.message);
+            toast.success('已优化辩题表述');
+        } catch (err) {
+            console.error('Failed to refine topic:', err);
+            toast.error(`话题优化失败: ${err.message}`);
         } finally {
             this.refineTopicBtn.disabled = false;
-            this.refineTopicBtn.textContent = originalText;
+            this.refineTopicBtn.innerHTML = original;
+            refreshIcons();
         }
     }
 
-    async startDebate() {
+    async _startDebate() {
         const topic = this.topicInput.value.trim();
         if (!topic) {
-            alert('请输入辩论主题');
+            toast.warn('请输入辩论主题');
+            return;
+        }
+        // Respect user-arranged drag order
+        const selectedOrdered = this.debaterList.getOrder().filter((name) =>
+            this.debaterList.getSelected().includes(name));
+        if (selectedOrdered.length < 2) {
+            toast.warn('请至少选择 2 位辩手');
             return;
         }
 
-        const selectedDebaters = this.getSelectedDebaters();
-        if (selectedDebaters.length < 2) {
-            alert('请至少选择2位辩手');
-            return;
-        }
+        const maxRounds = parseInt(this.maxRoundsInput.value, 10) || 10;
+        this.maxRounds = maxRounds;
+        this.totalRounds = maxRounds;
 
         try {
-            // Clear messages
-            this.messages.innerHTML = '';
-            this._lastSpeakerName = null;  // Reset for new debate
+            this.renderer.reset();
             this.chatTitle.textContent = topic;
+            this._setRoundProgress(0, maxRounds, null);
+            this.roundProgress.classList.add('active');
+            this.roundInfo.classList.add('active');
 
-            // Start debate
-            const response = await fetch('/api/debate/start', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    topic: topic,
-                    debater_names: selectedDebaters,
-                    max_rounds: parseInt(this.maxRoundsInput.value) || 10
-                })
+            await api.startDebate({
+                topic,
+                debater_names: selectedOrdered,
+                max_rounds: maxRounds,
             });
 
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || '启动辩论失败');
-            }
-
-            this.debateActive = true;
-            this.debatePaused = false;
-            this.updateUI('debating');
-            this.connectSSE();
-
-        } catch (error) {
-            console.error('Failed to start debate:', error);
-            alert(error.message);
-        }
-    }
-
-    getSelectedDebaters() {
-        const checkboxes = this.debaterList.querySelectorAll('input[type="checkbox"]:checked');
-        return Array.from(checkboxes).map(cb => cb.value);
-    }
-
-    _clearDragOver() {
-        this.debaterList.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-            el.classList.remove('drag-over-top', 'drag-over-bottom');
-        });
-    }
-
-    _parseSSEData(e, eventName) {
-        try {
-            return JSON.parse(e.data);
+            this.state.set('debating');
+            this._connectSSE();
         } catch (err) {
-            console.error(`Failed to parse SSE data for ${eventName}:`, err, e.data);
-            return null;
+            console.error('Failed to start debate:', err);
+            toast.error(`启动辩论失败: ${err.message}`);
         }
     }
 
-    connectSSE() {
-        this.eventSource = new EventSource('/api/debate/stream');
-
-        this.eventSource.addEventListener('debater_start', (e) => {
-            const data = this._parseSSEData(e, 'debater_start');
-            if (!data) return;
-            this._currentDebaterName = data.debater_name;
-            this._currentDebaterColor = data.color;
-            this._currentDebaterAvatar = data.avatar;
-            this.createMessage(data.debater_name, data.color, data.avatar, 'debater');
-        });
-
-        this.eventSource.addEventListener('thinking_chunk', (e) => {
-            const data = this._parseSSEData(e, 'thinking_chunk');
-            if (!data) return;
-            this.appendToThinking(data.text_chunk);
-        });
-
-        this.eventSource.addEventListener('debater_chunk', (e) => {
-            const data = this._parseSSEData(e, 'debater_chunk');
-            if (!data) return;
-            this.appendToMessage(data.text_chunk);
-        });
-
-        this.eventSource.addEventListener('debater_finalize', () => {
-            this.finalizeMessage();
-        });
-
-        this.eventSource.addEventListener('debater_end', (e) => {
-            this._parseSSEData(e, 'debater_end');
-            this.finalizeMessage();
-        });
-
-        this.eventSource.addEventListener('tool_call', (e) => {
-            const data = this._parseSSEData(e, 'tool_call');
-            if (!data) return;
-            // Finalize current text bubble (if any)
-            this.finalizeMessage();
-            // Render search card
-            this.addToolCard(data.debater_name, data.query, data.result_summary);
-        });
-
-        this.eventSource.addEventListener('round_end', (e) => {
-            const data = this._parseSSEData(e, 'round_end');
-            if (!data) return;
-            this.addSystemMessage(`第 ${data.round_number} 轮结束`);
-        });
-
-        this.eventSource.addEventListener('debate_paused', (e) => {
-            this._parseSSEData(e, 'debate_paused');
-            this.debatePaused = true;
-            this.debateActive = true;
-            this.updateUI('paused');
-            // Close SSE — resume will open a new one
-            if (this.eventSource) {
-                this.eventSource.close();
-                this.eventSource = null;
-            }
-            this.addSystemMessage('辩论已暂停');
-        });
-
-        this.eventSource.addEventListener('debate_end', (e) => {
-            const data = this._parseSSEData(e, 'debate_end');
-            if (!data) return;
-            this.debateActive = false;
-            this.debatePaused = false;
-            this.updateUI('stopped');
-            this.eventSource.close();
-            this.eventSource = null;
-            const reasonMap = { 'Max rounds reached': '已达到最大轮次' };
-            this.addSystemMessage(`辩论结束：${reasonMap[data.reason] || data.reason}`);
-
-            // Auto-trigger judge when debate ends naturally (max rounds reached)
-            if (data.reason === 'Max rounds reached') {
-                this.requestJudge();
-            }
-        });
-
-        this.eventSource.addEventListener('judge_chunk', (e) => {
-            const data = this._parseSSEData(e, 'judge_chunk');
-            if (!data) return;
-
-            // Create judge message if not exists
-            if (!this.currentMessageContainer || !this.currentMessageContainer.dataset.judge) {
-                this.createMessage('裁判', '#10b981', '⚖️', 'judge');
-                this.currentMessageContainer.dataset.judge = 'true';
-            }
-
-            this.appendToMessage(data.text_chunk);
-        });
-
-        this.eventSource.addEventListener('judge_result', (e) => {
-            this._parseSSEData(e, 'judge_result');
-            this.finalizeMessage();
-            // Judge is done — close SSE connection
-            if (this.eventSource) {
-                this.eventSource.close();
-                this.eventSource = null;
-            }
-        });
-
-        this.eventSource.addEventListener('debate_error', (e) => {
-            const data = this._parseSSEData(e, 'debate_error');
-            this.finalizeMessage();
-            this.debateActive = false;
-            this.debatePaused = false;
-            this.updateUI('stopped');
-            this.addSystemMessage(data?.message || '辩论过程中出错');
-            if (this.eventSource) {
-                this.eventSource.close();
-                this.eventSource = null;
-            }
-        });
-
-        this.eventSource.addEventListener('judge_error', (e) => {
-            const data = this._parseSSEData(e, 'judge_error');
-            this.finalizeMessage();
-            this.addSystemMessage(data?.message || '评判失败');
-            if (this.eventSource) {
-                this.eventSource.close();
-                this.eventSource = null;
-            }
-        });
-
-        this.eventSource.onerror = (e) => {
-            console.error('SSE error:', e);
-            if (this.eventSource) {
-                this.eventSource.close();
-                this.eventSource = null;
-            }
-        };
-    }
-
-    createMessage(name, color, avatar, type = 'debater') {
-        const message = document.createElement('div');
-        const isConsecutive = (this._lastSpeakerName === name);
-        message.className = isConsecutive ? 'message ai continuation' : 'message ai';
-        message.dataset.speaker = name;
-
-        const time = new Date().toLocaleTimeString();
-
-        const header = document.createElement('div');
-        header.className = 'message-header';
-
-        if (!isConsecutive) {
-            const avatarEl = document.createElement('span');
-            avatarEl.className = 'message-avatar';
-            avatarEl.textContent = avatar;
-            header.appendChild(avatarEl);
-
-            const senderEl = document.createElement('span');
-            senderEl.className = 'message-sender';
-            senderEl.style.color = this.sanitizeColor(color);
-            senderEl.textContent = name;
-            header.appendChild(senderEl);
-        }
-
-        const timeEl = document.createElement('span');
-        timeEl.className = 'message-time';
-        timeEl.textContent = time;
-        header.appendChild(timeEl);
-
-        message.appendChild(header);
-        // Don't create message-content yet - wait for actual content
-
-        this.messages.appendChild(message);
-        this.currentMessageContainer = message; // Store the container, not content
-        this.currentMessageEl = null; // Will be created when content arrives
-        this._lastSpeakerName = name;
-    }
-
-    appendToMessage(text) {
-        if (!this.currentMessageContainer) {
-            // No active message container — create one
-            this.createMessage(
-                this._currentDebaterName || 'Unknown',
-                this._currentDebaterColor || '#333333',
-                this._currentDebaterAvatar || '💬',
-                'debater'
-            );
-        }
-
-        // Create message-content if it doesn't exist yet
-        if (!this.currentMessageEl) {
-            const content = document.createElement('div');
-            content.className = 'message-content';
-            this.currentMessageContainer.appendChild(content);
-            this.currentMessageEl = content;
-        }
-
-        const raw = (this.currentMessageEl.dataset.raw || '') + text;
-        this.currentMessageEl.dataset.raw = raw;
-        this.currentMessageEl.innerHTML = this.renderContent(raw);
-        this.scrollToBottom();
-    }
-
-    appendToThinking(text) {
-        // Ensure message container exists
-        if (!this.currentMessageContainer) {
-            this.createMessage(
-                this._currentDebaterName || 'Unknown',
-                this._currentDebaterColor || '#333333',
-                this._currentDebaterAvatar || '💬',
-                'debater'
-            );
-        }
-
-        // Create thinking section if it doesn't exist
-        if (!this.currentThinkingEl) {
-            const thinkingSection = document.createElement('div');
-            thinkingSection.className = 'thinking-section';
-
-            const header = document.createElement('div');
-            header.className = 'thinking-header';
-            header.style.cursor = 'pointer';
-
-            const toggle = document.createElement('span');
-            toggle.className = 'thinking-toggle';
-            toggle.textContent = '▼';
-
-            const label = document.createElement('span');
-            label.className = 'thinking-label';
-            label.textContent = ' 💭 thinking...';
-
-            header.appendChild(toggle);
-            header.appendChild(label);
-
-            const thinkingSpan = document.createElement('div');
-            thinkingSpan.className = 'thinking-text';
-
-            const thinkingInner = document.createElement('div');
-            thinkingInner.className = 'thinking-text-inner';
-            thinkingSpan.appendChild(thinkingInner);
-
-            thinkingSection.appendChild(header);
-            thinkingSection.appendChild(thinkingSpan);
-
-            // Append to message container (thinking is independent of message-content)
-            this.currentMessageContainer.appendChild(thinkingSection);
-
-            this.currentThinkingEl = thinkingSection;
-        }
-
-        // Append text to thinking span
-        const thinkingText = this.currentThinkingEl.querySelector('.thinking-text-inner');
-        thinkingText.textContent += text;
-        this.scrollToBottom();
-    }
-
-    finalizeMessage() {
-        // Handle thinking section collapse
-        if (this.currentThinkingEl) {
-            const thinkingHeader = this.currentThinkingEl.querySelector('.thinking-header');
-            const thinkingText = this.currentThinkingEl.querySelector('.thinking-text');
-            const thinkingInner = this.currentThinkingEl.querySelector('.thinking-text-inner');
-            const hasThinking = thinkingInner && thinkingInner.textContent.trim();
-
-            if (hasThinking) {
-                thinkingText.classList.add('thinking-collapsed');
-                thinkingHeader.querySelector('.thinking-toggle').textContent = '▶';
-                thinkingHeader.querySelector('.thinking-label').textContent = ' 💭 thinking';
-
-                // Add click handler for toggle
-                thinkingHeader.onclick = () => {
-                    const collapsed = thinkingText.classList.toggle('thinking-collapsed');
-                    const toggleEl = thinkingHeader.querySelector('.thinking-toggle');
-                    toggleEl.style.transform = collapsed ? 'rotate(0deg)' : 'rotate(90deg)';
-                };
-            }
-        }
-
-        // Handle message-content rendering (if it exists)
-        if (this.currentMessageEl) {
-            const raw = this.currentMessageEl.dataset.raw || '';
-            this.currentMessageEl.innerHTML = this.renderContent(raw);
-        }
-
-        // Clear state
-        this.currentThinkingEl = null;
-        this.currentMessageEl = null;
-        this.currentMessageContainer = null;
-    }
-
-    addSystemMessage(text) {
-        const message = document.createElement('div');
-        message.className = 'message system';
-
-        const content = document.createElement('div');
-        content.className = 'message-content';
-        content.textContent = text;
-
-        message.appendChild(content);
-        this.messages.appendChild(message);
-        this.scrollToBottom();
-    }
-
-    addUserMessage(text) {
-        const message = document.createElement('div');
-        message.className = 'message user';
-
-        const time = new Date().toLocaleTimeString();
-
-        const header = document.createElement('div');
-        header.className = 'message-header';
-
-        const avatarEl = document.createElement('span');
-        avatarEl.className = 'message-avatar';
-        avatarEl.textContent = '👤';
-
-        const senderEl = document.createElement('span');
-        senderEl.className = 'message-sender';
-        senderEl.textContent = '你';
-
-        const timeEl = document.createElement('span');
-        timeEl.className = 'message-time';
-        timeEl.textContent = time;
-
-        header.appendChild(avatarEl);
-        header.appendChild(senderEl);
-        header.appendChild(timeEl);
-
-        const content = document.createElement('div');
-        content.className = 'message-content';
-        content.textContent = text;
-
-        message.appendChild(header);
-        message.appendChild(content);
-        this.messages.appendChild(message);
-    }
-
-    addToolCard(debaterName, query, resultSummary) {
-        const message = document.createElement('div');
-        const isConsecutive = (this._lastSpeakerName === debaterName);
-        message.className = isConsecutive ? 'message ai tool-card continuation' : 'message ai tool-card';
-        message.dataset.speaker = debaterName;
-
-        const header = document.createElement('div');
-        header.className = 'message-header';
-
-        if (!isConsecutive) {
-            const avatarEl = document.createElement('span');
-            avatarEl.className = 'message-avatar';
-            avatarEl.textContent = this._currentDebaterAvatar || '🔍';
-            header.appendChild(avatarEl);
-
-            const senderEl = document.createElement('span');
-            senderEl.className = 'message-sender';
-            senderEl.style.color = this.sanitizeColor(this._currentDebaterColor || '#333333');
-            senderEl.textContent = debaterName;
-            header.appendChild(senderEl);
-        }
-
-        const timeEl = document.createElement('span');
-        timeEl.className = 'message-time';
-        timeEl.textContent = new Date().toLocaleTimeString();
-        header.appendChild(timeEl);
-
-        const content = document.createElement('div');
-        content.className = 'tool-card-content';
-
-        const label = document.createElement('div');
-        label.className = 'tool-card-label';
-        label.title = 'Click to expand/collapse results';
-        label.style.cursor = 'pointer';
-
-        const toggle = document.createElement('span');
-        toggle.className = 'tool-card-toggle';
-        toggle.textContent = '▶';
-
-        const labelText = document.createTextNode(' 🔍 Searched: ');
-
-        const querySpan = document.createElement('span');
-        querySpan.textContent = query;
-
-        label.appendChild(toggle);
-        label.appendChild(labelText);
-        label.appendChild(querySpan);
-
-        const results = document.createElement('div');
-        results.className = 'tool-card-results tool-card-collapsed';
-
-        const resultsInner = document.createElement('div');
-        resultsInner.className = 'tool-card-results-inner';
-        resultsInner.innerHTML = this.renderContent(resultSummary || '');
-        results.appendChild(resultsInner);
-
-        label.addEventListener('click', () => {
-            const collapsed = results.classList.toggle('tool-card-collapsed');
-            const toggleEl = label.querySelector('.tool-card-toggle');
-            toggleEl.style.transform = collapsed ? 'rotate(0deg)' : 'rotate(90deg)';
-        });
-
-        content.appendChild(label);
-        content.appendChild(results);
-
-        message.appendChild(header);
-        message.appendChild(content);
-        this.messages.appendChild(message);
-        this._lastSpeakerName = debaterName;
-        this.scrollToBottom();
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    sanitizeColor(color) {
-        return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#333333';
-    }
-
-    renderContent(raw) {
+    async _stopDebate() {
         try {
-            // Protect [[Name]] patterns from marked.js before parsing.
-            // marked treats [[ as link reference syntax and mangles them.
-            const mentions = [];
-            const sanitized = raw.replace(/\[\[([^\]]+)\]\]/g, (match, name) => {
-                mentions.push(name);
-                return `%%MENTION_${mentions.length - 1}%%`;
-            });
-            // marked.parse() renders markdown to HTML.
-            // Raw HTML in the input is escaped by our custom renderer (see top of file).
-            const html = marked.parse(sanitized);
-            let result = html.replace(/%%MENTION_(\d+)%%/g, (_, i) => {
-                return `<span class="mention">${this.escapeHtml(mentions[parseInt(i)])}</span>`;
-            });
-            result = result.replace(/\[退让\]([\s\S]*?)\[\/退让\]/g, (_, text) => {
-                return `<span class="concession">${text}</span>`;
-            });
-            return result;
+            await api.stopDebate();
         } catch (err) {
-            console.error('marked.parse failed, falling back to escaped text:', err);
-            return this.escapeHtml(raw);
+            console.error('Failed to stop:', err);
+            toast.error(`暂停失败: ${err.message}`);
         }
     }
 
-    scrollToBottom() {
-        if (this._userScrolledUp) return;
-        const now = Date.now();
-        if (now - this._lastScrollTime < 800) return;
-        this._lastScrollTime = now;
-        this._isAutoScrolling = true;
-        this.messages.scrollTop = this.messages.scrollHeight;
-        requestAnimationFrame(() => { this._isAutoScrolling = false; });
-    }
-
-    async stopDebate() {
+    async _resumeDebate() {
         try {
-            const response = await fetch('/api/debate/stop', { method: 'POST' });
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || '暂停辩论失败');
-            }
-
-            // State update is handled by the 'debate_paused' SSE event
-
-        } catch (error) {
-            console.error('Failed to stop debate:', error);
-            alert(error.message);
+            await api.resumeDebate();
+            this.state.set('debating');
+            this._connectSSE();
+        } catch (err) {
+            console.error('Failed to resume:', err);
+            toast.error(`继续失败: ${err.message}`);
         }
     }
 
-    async resumeDebate() {
-        try {
-            const response = await fetch('/api/debate/resume', { method: 'POST' });
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || '继续辩论失败');
-            }
-
-            this.debatePaused = false;
-            this.updateUI('debating');
-            this.connectSSE();
-
-        } catch (error) {
-            console.error('Failed to resume debate:', error);
-            alert(error.message);
-        }
-    }
-
-    async sendUserMessage() {
+    async _sendUserMessage() {
         const text = this.userInput.value.trim();
         if (!text) return;
-
         try {
-            const response = await fetch('/api/debate/message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text })
-            });
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || '发送消息失败');
-            }
-
-            this.addUserMessage(text);
+            await api.sendMessage(text);
+            this.renderer.addUser(text);
             this.userInput.value = '';
-
-        } catch (error) {
-            console.error('Failed to send message:', error);
-            alert(error.message);
+            this.userInput.style.height = 'auto';
+        } catch (err) {
+            console.error('Send failed:', err);
+            toast.error(`发送失败: ${err.message}`);
         }
     }
 
-    async requestJudge() {
+    async _requestJudge() {
         try {
-            const response = await fetch('/api/debate/judge', { method: 'POST' });
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || '请求裁判失败');
-            }
-
-            // Reconnect SSE to receive judge events
-            // (previous SSE was closed when debate ended)
-            this.connectSSE();
-
-        } catch (error) {
-            console.error('Failed to request judge:', error);
-            alert(error.message);
+            this.state.set('judging');
+            await api.requestJudge();
+            this._connectSSE();
+        } catch (err) {
+            console.error('Judge failed:', err);
+            toast.error(`请求裁判失败: ${err.message}`);
+            this.state.set('stopped');
         }
     }
 
-    downloadChat() {
-        const topic = this.chatTitle.textContent;
-        const msgEls = this.messages.querySelectorAll('.message');
-        if (msgEls.length === 0) {
-            alert('没有可下载的消息。');
-            return;
-        }
-
-        const isDark = document.documentElement.classList.contains('dark');
-
-        const bg = isDark ? '#121217' : '#f5f1ea';
-        const fg = isDark ? '#e4e0d8' : '#1a1714';
-        const msgBg = isDark ? '#24242f' : '#fff';
-        const userBg = isDark ? 'linear-gradient(135deg,rgba(122,148,174,.12),#24242f)' : 'linear-gradient(135deg,rgba(45,62,80,.07),#fff)';
-        const border = isDark ? '#2e2e3e' : '#ddd7cc';
-        const muted = isDark ? '#706a60' : '#9a9183';
-
-        let body = '';
-        msgEls.forEach(el => {
-            if (el.classList.contains('system')) {
-                const text = el.querySelector('.message-content')?.textContent || '';
-                body += `<div class="sys-msg">${this.escapeHtml(text)}</div>\n`;
-            } else {
-                const avatar = el.querySelector('.message-avatar')?.textContent || '';
-                const sender = el.querySelector('.message-sender')?.textContent || '';
-                const color = el.querySelector('.message-sender')?.style.color || '#333';
-                const time = el.querySelector('.message-time')?.textContent || '';
-                // Tool cards use .tool-card-content, regular messages use .message-content
-                // Use raw dataset for debater messages (pre-markdown) when available,
-                // otherwise fall back to textContent for safety
-                const contentEl = el.querySelector('.message-content') ||
-                                  el.querySelector('.tool-card-content');
-                // Extract thinking text if present
-                const thinkingEl = el.querySelector('.thinking-text');
-                let thinkingContent = '';
-                if (thinkingEl) {
-                    thinkingContent = `<div style="color:${muted};font-size:.82rem;font-style:italic;margin-bottom:8px;padding:6px 10px;background:${bg};border-radius:6px">💭 ${this.escapeHtml(thinkingEl.textContent)}</div>`;
-                }
-                let content;
-                if (el.classList.contains('user') || el.classList.contains('system')) {
-                    content = this.escapeHtml(contentEl?.textContent || '');
-                } else if (contentEl?.dataset?.raw) {
-                    content = this.renderContent(contentEl.dataset.raw);
-                } else {
-                    content = this.escapeHtml(contentEl?.textContent || '');
-                }
-                const isUser = el.classList.contains('user');
-                const isToolCard = el.classList.contains('tool-card');
-                const cls = isUser ? 'user-msg' : (isToolCard ? 'tool-msg' : 'debater-msg');
-                body += `<div class="${cls}">
-  <div class="msg-header"><span class="avatar">${this.escapeHtml(avatar)}</span> <span class="sender" style="color:${color}">${this.escapeHtml(sender)}</span> <span class="time">${this.escapeHtml(time)}</span></div>
-  <div class="msg-body">${thinkingContent}${content}</div>
-</div>\n`;
-            }
-        });
-
-        const html = `<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><title>${this.escapeHtml(topic)}</title>
-<style>
-  body{font-family:'Outfit',system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;background:${bg};color:${fg};line-height:1.7}
-  h1{font-family:'Playfair Display',Georgia,serif;font-size:1.4rem;text-align:center;padding-bottom:16px;border-bottom:2px solid #c0503a;margin-bottom:28px}
-  .debater-msg,.user-msg,.tool-msg{margin-bottom:22px}
-  .msg-header{font-size:.82rem;margin-bottom:4px}
-  .msg-header .avatar{font-size:1rem}
-  .msg-header .sender{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:.78rem;letter-spacing:.04em}
-  .msg-header .time{color:${muted};font-size:.72rem;margin-left:6px}
-  .msg-body{background:${msgBg};padding:14px 18px;border-radius:12px;border-left:3px solid #c0503a;box-shadow:0 1px 3px rgba(80,65,40,.06);font-size:.93rem}
-  .user-msg .msg-body{border-left-color:#2d3e50;background:${userBg}}
-  .sys-msg{text-align:center;color:${muted};font-style:italic;font-size:.84rem;margin:12px 0}
-  .sys-msg::before,.sys-msg::after{content:' — ';color:${border}}
-  .tool-msg .msg-body{border-left:1px dashed ${border};background:${bg};font-size:.85rem;color:${muted};padding:10px 14px}
-  .tool-card-label{font-weight:500;color:${fg};margin-bottom:8px}
-  .tool-card-results{margin-top:8px;padding:8px 12px;background:${msgBg};border-radius:6px;font-size:.82rem}
-</style></head><body>
-<h1>${this.escapeHtml(topic)}</h1>
-${body}
-</body></html>`;
-
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `debate-${Date.now()}.html`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    async addCustomDebater() {
+    async _addCustomDebater() {
         const name = this.customName.value.trim();
         const color = this.customColor.value;
         const avatar = this.customAvatar.value.trim() || '💬';
         const stance = this.customStance.value;
         const personality = this.customPersonality.value.trim();
 
-        if (!name) {
-            alert('请输入辩手名称');
-            return;
-        }
-
-        if (!personality) {
-            alert('请输入性格描述');
-            return;
-        }
+        if (!name) return toast.warn('请输入辩手名称');
+        if (!personality) return toast.warn('请填写性格描述');
 
         try {
-            const response = await fetch('/api/debaters', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name,
-                    color,
-                    avatar,
-                    stance,
-                    personality
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || '创建辩手失败');
-            }
-
-            // Clear form
+            await api.createDebater({ name, color, avatar, stance, personality });
             this.customName.value = '';
             this.customAvatar.value = '';
             this.customPersonality.value = '';
-
-            // Reload debater list
-            await this.loadDebaters();
-
-        } catch (error) {
-            console.error('Failed to create debater:', error);
-            alert(error.message);
+            await this._loadDebaters();
+            toast.success(`已添加辩手「${name}」`);
+        } catch (err) {
+            console.error('Create debater failed:', err);
+            toast.error(`创建辩手失败: ${err.message}`);
         }
     }
 
-    updateUI(state) {
-        // state: 'idle', 'debating', 'paused', 'stopped'
+    // ─── SSE ───────────────────────────────────────
+
+    _connectSSE() {
+        if (this.sse) this.sse.close();
+        this.sse = new SSEClient('/api/debate/stream');
+        this.sse.addEventListener('event', (e) => this._handleSSEEvent(e.detail));
+        this.sse.addEventListener('status', (e) => this._handleSSEStatus(e.detail));
+        this.sse.connect();
+    }
+
+    _handleSSEStatus({ state }) {
+        if (state === 'disconnected') {
+            this._setConnectionIndicator('连接已断开');
+            toast.error('与服务器的连接已断开', { duration: 5000 });
+        } else if (state === 'reconnecting') {
+            this._setConnectionIndicator('重新连接…');
+        } else {
+            this._setConnectionIndicator(null);
+        }
+    }
+
+    _setConnectionIndicator(text) {
+        if (!this.connectionIndicator) return;
+        if (!text) {
+            this.connectionIndicator.classList.remove('visible');
+            return;
+        }
+        this.connectionIndicator.textContent = text;
+        this.connectionIndicator.classList.add('visible');
+    }
+
+    _handleSSEEvent({ type, data }) {
+        switch (type) {
+            case 'debater_start':
+                this.currentSpeaker = data.debater_name;
+                this.renderer.startDebaterTurn({
+                    name: data.debater_name,
+                    color: data.color,
+                    avatar: data.avatar,
+                });
+                if (typeof data.round_number === 'number') {
+                    this.currentRound = data.round_number + 1;
+                }
+                if (typeof data.total_rounds === 'number' && data.total_rounds > 0) {
+                    this.totalRounds = data.total_rounds;
+                }
+                this._setRoundProgress(this.currentRound, this.totalRounds, data.debater_name);
+                break;
+
+            case 'thinking_chunk':
+                this.renderer.appendThinking(data.text_chunk);
+                break;
+
+            case 'debater_chunk':
+                this.renderer.appendChunk(data.text_chunk);
+                break;
+
+            case 'debater_finalize':
+                this.renderer.finalize();
+                break;
+
+            case 'debater_end':
+                this.renderer.finalize();
+                break;
+
+            case 'tool_call':
+                this.renderer.finalize();
+                this.renderer.addToolCard({
+                    debaterName: data.debater_name,
+                    query: data.query,
+                    resultSummary: data.result_summary,
+                });
+                break;
+
+            case 'round_end':
+                this.renderer.addSystem(`第 ${data.round_number} 轮结束`);
+                this.currentRound = data.round_number;
+                this._setRoundProgress(this.currentRound, this.totalRounds, null);
+                break;
+
+            case 'debate_paused':
+                this.state.set('paused');
+                this.renderer.addSystem('辩论已暂停');
+                break;
+
+            case 'debate_end': {
+                this.state.set('stopped');
+                const reasonMap = { 'Max rounds reached': '已达到最大轮次' };
+                this.renderer.addSystem(`辩论结束：${reasonMap[data.reason] || data.reason}`);
+                this._setRoundProgress(this.totalRounds, this.totalRounds, null);
+                if (data.reason === 'Max rounds reached') {
+                    // Auto-judge
+                    setTimeout(() => this._requestJudge(), 400);
+                }
+                break;
+            }
+
+            case 'judge_chunk':
+                this.renderer.appendJudgeChunk(data.text_chunk);
+                break;
+
+            case 'judge_result':
+                this.renderer.finalize();
+                this.state.set('stopped');
+                break;
+
+            case 'debate_error':
+                this.renderer.finalize();
+                this.state.set('stopped');
+                toast.error(data?.message || '辩论过程中出错');
+                this.renderer.addSystem(data?.message || '辩论过程中出错');
+                break;
+
+            case 'judge_error':
+                this.renderer.finalize();
+                this.state.set('stopped');
+                toast.error(data?.message || '评判失败');
+                this.renderer.addSystem(data?.message || '评判失败');
+                break;
+        }
+    }
+
+    _setRoundProgress(current, total, speakerName) {
+        const pct = total > 0 ? Math.min(100, Math.max(0, (current / total) * 100)) : 0;
+        this.roundProgressFill.style.width = pct + '%';
+        if (speakerName) {
+            this.currentSpeakerEl.textContent = speakerName;
+            this.currentSpeakerEl.previousElementSibling?.classList.remove('hidden');
+        } else if (current >= total && total > 0) {
+            this.currentSpeakerEl.textContent = '已完成';
+        } else {
+            this.currentSpeakerEl.textContent = '等待开始…';
+        }
+        this.roundBadgeEl.textContent = `第 ${Math.min(current + (speakerName ? 0 : 0), total)} / ${total} 轮`;
+        // Clearer math: show current round (1-based when speaker active) or completed count
+        const displayRound = speakerName ? Math.max(1, current) : current;
+        this.roundBadgeEl.textContent = `第 ${displayRound} / ${total} 轮`;
+    }
+
+    // ─── UI state machine ──────────────────────────
+
+    _applyUIState(state) {
+        const set = (el, key, value) => {
+            if (!el) return;
+            el[key] = value;
+        };
 
         switch (state) {
             case 'idle':
-                this.startBtn.disabled = false;
-                this.stopBtn.disabled = true;
-                this.resumeBtn.disabled = true;
-                this.userInput.disabled = true;
-                this.sendBtn.disabled = true;
-                this.judgeBtn.disabled = true;
+                set(this.startBtn,  'disabled', false);
+                set(this.stopBtn,   'disabled', true);
+                set(this.resumeBtn, 'disabled', true);
+                set(this.userInput, 'disabled', true);
+                set(this.sendBtn,   'disabled', true);
+                set(this.judgeBtn,  'disabled', true);
                 this.judgeBtn.hidden = true;
+                set(this.downloadBtn, 'disabled', true);
+                this.roundProgress.classList.remove('active');
+                this.roundInfo.classList.remove('active');
                 break;
 
             case 'debating':
-                this.startBtn.disabled = true;
-                this.stopBtn.disabled = false;
-                this.resumeBtn.disabled = true;
-                this.userInput.disabled = false;
-                this.sendBtn.disabled = false;
-                this.judgeBtn.disabled = true;
+                set(this.startBtn,  'disabled', true);
+                set(this.stopBtn,   'disabled', false);
+                set(this.resumeBtn, 'disabled', true);
+                set(this.userInput, 'disabled', false);
+                set(this.sendBtn,   'disabled', false);
+                set(this.judgeBtn,  'disabled', true);
                 this.judgeBtn.hidden = true;
-                this.downloadBtn.disabled = false;
+                set(this.downloadBtn, 'disabled', false);
                 break;
 
             case 'paused':
-                this.startBtn.disabled = true;
-                this.stopBtn.disabled = true;
-                this.resumeBtn.disabled = false;
-                this.userInput.disabled = true;
-                this.sendBtn.disabled = true;
-                this.judgeBtn.disabled = true;
-                this.judgeBtn.hidden = true;
-                this.downloadBtn.disabled = false;
+                set(this.startBtn,  'disabled', true);
+                set(this.stopBtn,   'disabled', true);
+                set(this.resumeBtn, 'disabled', false);
+                set(this.userInput, 'disabled', true);
+                set(this.sendBtn,   'disabled', true);
+                set(this.judgeBtn,  'disabled', false);
+                this.judgeBtn.hidden = false;
+                set(this.downloadBtn, 'disabled', false);
                 break;
 
             case 'stopped':
-                this.startBtn.disabled = false;
-                this.stopBtn.disabled = true;
-                this.resumeBtn.disabled = true;
-                this.userInput.disabled = true;
-                this.sendBtn.disabled = true;
-                this.judgeBtn.disabled = false;
+                set(this.startBtn,  'disabled', false);
+                set(this.stopBtn,   'disabled', true);
+                set(this.resumeBtn, 'disabled', true);
+                set(this.userInput, 'disabled', true);
+                set(this.sendBtn,   'disabled', true);
+                set(this.judgeBtn,  'disabled', false);
                 this.judgeBtn.hidden = false;
-                this.downloadBtn.disabled = false;
+                set(this.downloadBtn, 'disabled', false);
+                break;
+
+            case 'judging':
+                set(this.startBtn,  'disabled', true);
+                set(this.stopBtn,   'disabled', true);
+                set(this.resumeBtn, 'disabled', true);
+                set(this.userInput, 'disabled', true);
+                set(this.sendBtn,   'disabled', true);
+                set(this.judgeBtn,  'disabled', true);
+                this.judgeBtn.hidden = false;
                 break;
         }
     }
 
-    initTheme() {
-        const stored = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const dark = stored === 'dark' || (!stored && prefersDark);
-        if (dark) document.documentElement.classList.add('dark');
-        this._updateThemeIcon(dark);
+    _updateThemeIcon(dark) {
+        if (!this.themeToggle) return;
+        this.themeToggle.innerHTML = '';
+        const span = document.createElement('span');
+        span.dataset.lucide = dark ? 'sun' : 'moon';
+        span.className = 'icon-slot';
+        this.themeToggle.appendChild(span);
+        refreshIcons();
     }
 
-    toggleTheme() {
-        const isDark = document.documentElement.classList.toggle('dark');
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        this._updateThemeIcon(isDark);
-    }
+    // ─── Download ──────────────────────────────────
 
-    _updateThemeIcon(isDark) {
-        if (this.themeToggle) this.themeToggle.textContent = isDark ? '☀️' : '🌙';
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // Search Tool Methods
-    // ═══════════════════════════════════════════════════════
-
-    openSearchDrawer() {
-        this._indexMessages();
-        this.searchDrawer.classList.add('open');
-        this.searchBackdrop.classList.add('open');
-        setTimeout(() => this.searchInput.focus(), 100);
-    }
-
-    closeSearchDrawer() {
-        this.searchDrawer.classList.remove('open');
-        this.searchBackdrop.classList.remove('open');
-        this.searchInput.value = '';
-        this.searchResults.innerHTML = '';
-        this.searchToggleBtn.focus();
-    }
-
-    _indexMessages() {
-        // Build searchable index from all rendered messages (including tool cards)
-        this._messageIndex = [];
+    _downloadChat() {
+        const topic = this.chatTitle.textContent;
         const msgEls = this.messages.querySelectorAll('.message');
-        msgEls.forEach((el, idx) => {
-            // Regular messages use .message-content, tool cards use .tool-card-content
-            const contentEl = el.querySelector('.message-content') ||
-                              el.querySelector('.tool-card-content');
-            if (!contentEl) return;
+        if (!msgEls.length) {
+            toast.warn('没有可下载的消息');
+            return;
+        }
 
-            // Prefer raw markdown text (dataset.raw) when available for better
-            // matching of [[Name]] mentions and original markdown formatting.
-            // Fall back to innerText for user/system messages without raw data.
-            const text = contentEl.dataset.raw || contentEl.innerText || '';
-            const sender = el.querySelector('.message-sender')?.textContent || '';
+        const dark = isDark();
+        const palette = dark ? {
+            bg: '#0f1014', fg: '#ebe6dc', card: '#22232e', input: '#1d1e28',
+            muted: '#8e8675', border: '#2e2f3d', user: 'linear-gradient(135deg,rgba(125,160,178,.14),#22232e)',
+        } : {
+            bg: '#f5f1ea', fg: '#1a1714', card: '#ffffff', input: '#f0ece4',
+            muted: '#7a6f5d', border: '#d4c8b1', user: 'linear-gradient(135deg,rgba(62,82,96,.10),#ffffff)',
+        };
+
+        let body = '';
+        msgEls.forEach((el) => {
+            if (el.classList.contains('system')) {
+                const text = el.querySelector('.message-content')?.textContent || '';
+                body += `<div class="sys-msg">${escapeHtml(text)}</div>\n`;
+                return;
+            }
             const avatar = el.querySelector('.message-avatar')?.textContent || '';
+            const sender = el.querySelector('.message-sender')?.textContent || '';
+            const color = el.querySelector('.message-sender')?.style.color || '#333';
             const time = el.querySelector('.message-time')?.textContent || '';
-            const color = el.querySelector('.message-sender')?.style.color || '#333333';
-
-            this._messageIndex.push({
-                id: idx,
-                element: el,
-                text,
-                sender,
-                avatar,
-                time,
-                color
-            });
-        });
-    }
-
-    handleSearch() {
-        const query = this.searchInput.value.trim().toLowerCase();
-
-        if (!query) {
-            this.searchResults.innerHTML = '';
-            return;
-        }
-
-        // Search through indexed messages
-        const matches = this._messageIndex
-            .filter(msg => msg.text.toLowerCase().includes(query))
-            .slice(0, 10); // Limit to 10 results
-
-        this._renderSearchResults(matches, query);
-    }
-
-    _renderSearchResults(matches, query) {
-        this.searchResults.innerHTML = '';
-
-        if (matches.length === 0) {
-            this.searchResults.innerHTML = '<div class="search-empty">没有找到匹配的消息</div>';
-            return;
-        }
-
-        matches.forEach(msg => {
-            const item = document.createElement('div');
-            item.className = 'search-result-item';
-
-            // Create header
-            const header = document.createElement('div');
-            header.className = 'search-result-header';
-
-            const avatarEl = document.createElement('span');
-            avatarEl.className = 'search-result-avatar';
-            avatarEl.textContent = msg.avatar;
-
-            const senderEl = document.createElement('span');
-            senderEl.className = 'search-result-sender';
-            senderEl.style.color = this.sanitizeColor(msg.color);
-            senderEl.textContent = msg.sender;
-
-            const timeEl = document.createElement('span');
-            timeEl.className = 'search-result-time';
-            timeEl.textContent = msg.time;
-
-            header.appendChild(avatarEl);
-            header.appendChild(senderEl);
-            header.appendChild(timeEl);
-
-            // Create preview with highlight
-            const preview = document.createElement('div');
-            preview.className = 'search-result-preview';
-            preview.innerHTML = this._highlightText(msg.text, query);
-
-            item.appendChild(header);
-            item.appendChild(preview);
-
-            // Click to scroll and highlight
-            item.addEventListener('click', () => {
-                this.closeSearchDrawer();
-                this.scrollToMessage(msg.element);
-            });
-
-            this.searchResults.appendChild(item);
-        });
-    }
-
-    _highlightText(text, query) {
-        // Escape HTML first
-        const escaped = this.escapeHtml(text);
-
-        // Create case-insensitive regex for highlighting
-        const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi');
-        return escaped.replace(regex, '<span class="search-highlight">$1</span>');
-    }
-
-    escapeRegex(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    scrollToMessage(element) {
-        // Remove previous highlight
-        this.messages.querySelectorAll('.message.highlight').forEach(el => {
-            el.classList.remove('highlight');
+            const contentEl = el.querySelector('.message-content') || el.querySelector('.tool-card-content');
+            const thinkingRaw = el.querySelector('.thinking-text-inner')?.dataset.raw || '';
+            const thinkingHtml = thinkingRaw
+                ? `<div style="color:${palette.muted};font-size:.82rem;font-style:italic;margin-bottom:8px;padding:6px 10px;background:${palette.input};border-radius:6px">💭 ${escapeHtml(thinkingRaw)}</div>`
+                : '';
+            let content;
+            if (el.classList.contains('user')) {
+                content = escapeHtml(contentEl?.textContent || '');
+            } else if (contentEl?.dataset?.raw) {
+                content = renderMarkdown(contentEl.dataset.raw);
+            } else {
+                content = escapeHtml(contentEl?.textContent || '');
+            }
+            const isUser = el.classList.contains('user');
+            const isTool = el.classList.contains('tool-card');
+            const cls = isUser ? 'user-msg' : (isTool ? 'tool-msg' : 'debater-msg');
+            body += `<div class="${cls}">
+  <div class="msg-header"><span class="avatar">${escapeHtml(avatar)}</span> <span class="sender" style="color:${color}">${escapeHtml(sender)}</span> <span class="time">${escapeHtml(time)}</span></div>
+  <div class="msg-body">${thinkingHtml}${content}</div>
+</div>\n`;
         });
 
-        // Scroll into view
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const html = `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>${escapeHtml(topic)}</title>
+<style>
+  body{font-family:Georgia,serif;max-width:780px;margin:40px auto;padding:0 20px;background:${palette.bg};color:${palette.fg};line-height:1.75}
+  h1{font-size:1.5rem;text-align:center;padding-bottom:16px;border-bottom:2px solid #a67b32;margin-bottom:32px}
+  .debater-msg,.user-msg,.tool-msg{margin-bottom:24px}
+  .msg-header{font-size:.82rem;margin-bottom:6px}
+  .msg-header .avatar{font-size:1rem}
+  .msg-header .sender{font-weight:700;font-size:.85rem;letter-spacing:.04em}
+  .msg-header .time{color:${palette.muted};font-size:.72rem;margin-left:8px}
+  .msg-body{background:${palette.card};padding:14px 18px;border-radius:12px;border-left:3px solid #a67b32;font-size:.95rem}
+  .user-msg .msg-body{border-left-color:#3e5260;background:${palette.user}}
+  .sys-msg{text-align:center;color:${palette.muted};font-style:italic;font-size:.84rem;margin:14px 0}
+  .sys-msg::before,.sys-msg::after{content:' — ';color:${palette.border}}
+  .tool-msg .msg-body{border-left:1px dashed ${palette.border};background:${palette.input};font-size:.85rem;color:${palette.muted};padding:10px 14px}
+  .mention{background:rgba(166,123,50,.14);color:#8b5a14;border-radius:4px;padding:1px 6px;font-weight:600}
+  blockquote{margin:0.6em 0;padding:0.4em 0.9em;border-left:2px solid #a67b32;background:rgba(166,123,50,.10);color:${palette.muted};font-style:italic;border-radius:0 4px 4px 0}
+  code{background:${palette.input};padding:1px 5px;border-radius:4px}
+  pre{background:${palette.input};border:1px solid ${palette.border};border-radius:8px;padding:12px;overflow-x:auto}
+</style></head><body>
+<h1>${escapeHtml(topic)}</h1>
+${body}
+</body></html>`;
 
-        // Add highlight animation
-        element.classList.add('highlight');
-
-        // Remove highlight after animation completes
-        setTimeout(() => {
-            element.classList.remove('highlight');
-        }, 2000);
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = topic.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || 'debate';
+        a.download = `${safeName}-${Date.now()}.html`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        toast.success('已下载辩论记录');
     }
 }
 
-// Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new DebateApp();
 });

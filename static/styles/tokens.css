@@ -1,0 +1,143 @@
+/* ═══════════════════════════════════════════════════════
+   Design Tokens — colors, spacing, typography, motion
+   ═══════════════════════════════════════════════════════ */
+
+@layer tokens {
+    :root {
+        /* Surfaces — warm parchment */
+        --bg-base:       #f5f1ea;
+        --bg-surface:    #faf8f4;
+        --bg-elevated:   #ffffff;
+        --bg-card:       #ffffff;
+        --bg-input:      #f0ece4;
+        --bg-overlay:    rgba(26, 23, 20, 0.45);
+
+        /* Borders & shadows */
+        --border:        #d4c8b1;
+        --border-hover:  #c0a0a8;
+        --border-strong: #a89270;
+        --shadow-sm:     0 1px 2px rgba(166, 115, 50, 0.05);
+        --shadow-md:     0 2px 8px rgba(166, 115, 50, 0.07);
+        --shadow-lg:     0 4px 16px rgba(166, 115, 50, 0.09);
+        --shadow-xl:     0 10px 32px rgba(166, 115, 50, 0.14);
+
+        /* Text */
+        --ink:           #1a1714;
+        --ink-soft:      #4a4338;
+        --ink-muted:     #7a6f5d;
+
+        /* Brand accents */
+        --gold:          #a67b32;
+        --gold-dim:      #8b5a14;
+        --gold-glow:     rgba(166, 115, 50, 0.14);
+        --sage:          #5a6e50;
+        --sage-dim:      #3d4d40;
+        --sage-glow:     rgba(90, 110, 80, 0.10);
+        --navy:          #3e5260;
+        --navy-glow:     rgba(62, 82, 96, 0.10);
+        --rose:          #b85450;
+
+        /* Typography */
+        --font-display:  'Merriweather', Georgia, 'Songti SC', 'STSong', serif;
+        --font-body:     'Source Sans Pro', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        --font-mono:     'Source Code Pro', 'JetBrains Mono', ui-monospace, monospace;
+
+        --text-xs:       0.72rem;
+        --text-sm:       0.85rem;
+        --text-base:     0.94rem;
+        --text-md:       1rem;
+        --text-lg:       1.15rem;
+        --text-xl:       1.4rem;
+        --text-2xl:      1.8rem;
+
+        --leading-tight: 1.35;
+        --leading-base:  1.65;
+        --leading-loose: 1.78;
+
+        /* Spacing scale */
+        --space-1:       0.25rem;
+        --space-2:       0.5rem;
+        --space-3:       0.75rem;
+        --space-4:       1rem;
+        --space-5:       1.5rem;
+        --space-6:       2rem;
+        --space-7:       3rem;
+        --space-8:       4rem;
+
+        /* Radii */
+        --radius-xs:     4px;
+        --radius-sm:     8px;
+        --radius-md:     12px;
+        --radius-lg:     16px;
+        --radius-xl:     24px;
+        --radius-full:   9999px;
+
+        /* Motion */
+        --duration-instant: 100ms;
+        --duration-fast:    180ms;
+        --duration-base:    260ms;
+        --duration-slow:    420ms;
+        --ease-out:         cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-spring:      cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        --ease-in-out:      cubic-bezier(0.65, 0, 0.35, 1);
+
+        /* Layout */
+        --sidebar-w:        380px;
+        --content-max:      760px;
+        --header-h:         64px;
+
+        /* Z-index scale */
+        --z-base:           1;
+        --z-floating:       10;
+        --z-toast:          70;
+        --z-overlay:        80;
+        --z-dialog:         90;
+    }
+
+    html.dark {
+        --bg-base:       #0f1014;
+        --bg-surface:    #181820;
+        --bg-elevated:   #22232e;
+        --bg-card:       #282935;
+        --bg-input:      #1d1e28;
+        --bg-overlay:    rgba(0, 0, 0, 0.55);
+
+        --border:        #2e2f3d;
+        --border-hover:  #44455a;
+        --border-strong: #5a5b72;
+        --shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.30);
+        --shadow-md:     0 2px 12px rgba(0, 0, 0, 0.40);
+        --shadow-lg:     0 6px 22px rgba(0, 0, 0, 0.48);
+        --shadow-xl:     0 14px 40px rgba(0, 0, 0, 0.55);
+
+        --ink:           #ebe6dc;
+        --ink-soft:      #c4bdae;
+        --ink-muted:     #8e8675;
+
+        --gold:          #d4a040;
+        --gold-dim:      #b88528;
+        --gold-glow:     rgba(212, 160, 64, 0.18);
+        --sage:          #7eb070;
+        --sage-dim:      #5a8050;
+        --sage-glow:     rgba(126, 176, 112, 0.14);
+        --navy:          #7da0b2;
+        --navy-glow:     rgba(125, 160, 178, 0.14);
+        --rose:          #d77571;
+    }
+
+    /* Respect reduced motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+        :root {
+            --duration-instant: 1ms;
+            --duration-fast:    1ms;
+            --duration-base:    1ms;
+            --duration-slow:    1ms;
+        }
+        *, *::before, *::after {
+            animation-duration: 1ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 1ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+}

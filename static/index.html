@@ -3,92 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 辩论聊天室</title>
+    <meta name="color-scheme" content="light dark">
+    <meta name="description" content="The Salon — 多智能体辩论沙龙">
+    <title>The Salon · AI 辩论</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Source+Sans+Pro:wght@300;400;600;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=14">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="/static/styles/main.css?v=20">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 </head>
 <body>
-    <div class="app">
-        <aside class="sidebar">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:18px;border-bottom:2px solid var(--gold)">
-                <h1 style="border:none;padding:0">AI 辩论</h1>
-                <div style="display:flex;gap:4px">
-                    <button class="icon-btn" id="theme-toggle" title="切换主题">🌙</button>
+    <div class="app" id="app">
+        <aside class="sidebar" aria-label="侧边栏">
+            <header class="brand">
+                <h1>The Salon</h1>
+                <div class="brand-actions">
+                    <button class="icon-btn" id="theme-toggle" type="button" aria-label="切换主题" title="切换主题">
+                        <span data-lucide="moon" class="icon-slot"></span>
+                    </button>
                 </div>
-            </div>
+            </header>
 
-            <section class="sidebar-section">
-                <label for="topic-input">辩论主题</label>
-                <textarea id="topic-input" rows="3" placeholder="输入辩论主题..."></textarea>
-                <div class="max-rounds-row">
-                    <label for="max-rounds">最大轮次</label>
-                    <input type="number" id="max-rounds" min="1" max="20" step="1" value="10">
-                    <button class="refine-btn" id="refine-topic-btn" title="AI 优化话题表述">✨ 优化</button>
+            <section class="sidebar-section" aria-labelledby="topic-label">
+                <label class="field-label" id="topic-label" for="topic-input">辩论主题</label>
+                <textarea id="topic-input" rows="3" placeholder="输入辩论主题 — Ctrl+Enter 直接开始"></textarea>
+                <div class="field-row">
+                    <label class="field-label" for="max-rounds">最大轮次</label>
+                    <input type="number" id="max-rounds" class="max-rounds-input" min="1" max="50" step="1" value="10">
+                    <button class="refine-btn" id="refine-topic-btn" type="button" title="使用 AI 优化主题表述">
+                        <span data-lucide="sparkles" class="icon-slot"></span>
+                        <span>优化</span>
+                    </button>
                 </div>
             </section>
 
-            <section class="sidebar-section">
-                <label>辩手</label>
-                <div id="debater-list"></div>
+            <section class="sidebar-section" aria-labelledby="debaters-label">
+                <span class="field-label" id="debaters-label">辩手（拖拽以调整顺序）</span>
+                <div id="debater-list" class="debater-list" role="list"></div>
             </section>
 
             <section class="sidebar-section">
-                <button id="start-btn" class="primary-btn">开始辩论</button>
-                <button id="stop-btn" disabled>暂停</button>
-                <button id="resume-btn" disabled>继续</button>
+                <div class="control-row">
+                    <button id="start-btn" class="primary-btn" type="button">开始辩论</button>
+                    <button id="stop-btn" type="button" disabled>暂停</button>
+                    <button id="resume-btn" type="button" disabled>继续</button>
+                </div>
             </section>
 
             <section class="sidebar-section">
                 <h3>自定义辩手</h3>
-                <input type="text" id="custom-name" placeholder="名称">
+                <input type="text" id="custom-name" placeholder="名称" autocomplete="off">
                 <div class="inline-inputs">
-                    <input type="color" id="custom-color" value="#ff6600">
-                    <input type="text" id="custom-avatar" placeholder="表情" maxlength="2">
+                    <input type="color" id="custom-color" value="#a67b32" aria-label="选择颜色">
+                    <input type="text" id="custom-avatar" placeholder="表情符号" maxlength="2" autocomplete="off">
                 </div>
-                <select id="custom-stance">
+                <select id="custom-stance" aria-label="立场">
                     <option value="正方">正方</option>
                     <option value="反方">反方</option>
                     <option value="中立" selected>中立</option>
                 </select>
-                <textarea id="custom-personality" rows="3" placeholder="性格描述..."></textarea>
-                <button id="add-debater-btn">添加辩手</button>
+                <textarea id="custom-personality" rows="3" placeholder="性格描述 —— 越具体，表现越鲜明"></textarea>
+                <button id="add-debater-btn" type="button">添加辩手</button>
             </section>
         </aside>
 
         <main class="chat-area">
             <header class="chat-header">
-                <h2 id="chat-title">输入主题开始辩论</h2>
-                <button id="judge-btn" disabled hidden>请裁判点评</button>
-                <button id="download-btn" disabled>下载</button>
+                <h2 id="chat-title">等待开启一场辩论…</h2>
+                <div class="chat-header-actions">
+                    <button id="judge-btn" class="sage-btn" type="button" hidden disabled>
+                        <span data-lucide="gavel" class="icon-slot"></span>
+                        <span>请裁判点评</span>
+                    </button>
+                    <button id="download-btn" class="navy-btn" type="button" disabled>
+                        <span data-lucide="download" class="icon-slot"></span>
+                        <span>下载</span>
+                    </button>
+                </div>
             </header>
 
-            <div id="messages" class="messages"></div>
-
-            <!-- Search Tool Button (Fixed Position) -->
-            <button class="search-toggle-btn" id="search-toggle-btn" title="搜索消息">🔍</button>
-
-            <!-- Search Drawer -->
-            <div class="search-backdrop" id="search-backdrop"></div>
-            <div class="search-drawer" id="search-drawer">
-                <div class="search-drawer-header">
-                    <h3>搜索消息</h3>
-                    <button class="icon-btn" id="search-close" title="关闭">✕</button>
-                </div>
-                <input type="text" id="search-input" placeholder="输入关键词搜索...">
-                <div id="search-results" class="search-results"></div>
+            <div class="round-progress" id="round-progress" aria-hidden="true">
+                <div class="round-progress-fill" id="round-progress-fill"></div>
             </div>
 
-            <div class="input-bar">
-                <input type="text" id="user-input" placeholder="参与讨论..." disabled>
-                <button id="send-btn" disabled>发送</button>
+            <div class="round-info" id="round-info">
+                <span data-lucide="user" class="icon-slot"></span>
+                <span>当前发言：</span>
+                <span class="current-speaker" id="current-speaker">等待开始…</span>
+                <span class="round-badge" id="round-badge">第 0 / 0 轮</span>
             </div>
+
+            <div id="messages" class="messages" aria-live="polite" aria-atomic="false" aria-relevant="additions"></div>
+
+            <div class="connection-indicator" id="connection-indicator" role="status"></div>
+
+            <button class="search-toggle-btn" id="search-toggle-btn" type="button" title="搜索消息 (Ctrl+K)" aria-label="搜索消息">
+                <span data-lucide="search" class="icon-slot"></span>
+            </button>
+
+            <form class="input-bar" id="input-bar" onsubmit="return false">
+                <textarea id="user-input" placeholder="参与讨论 — Enter 发送，Shift+Enter 换行" rows="1" disabled></textarea>
+                <button id="send-btn" class="primary-btn" type="submit" disabled>
+                    <span data-lucide="send-horizontal" class="icon-slot"></span>
+                    <span>发送</span>
+                </button>
+            </form>
         </main>
     </div>
 
-    <script src="/static/app.js?v=17"></script>
+    <dialog class="search-dialog" id="search-dialog" aria-label="搜索辩论消息">
+        <div class="search-dialog-header">
+            <h3>搜索消息</h3>
+            <button class="icon-btn" id="search-close" type="button" aria-label="关闭">
+                <span data-lucide="x" class="icon-slot"></span>
+            </button>
+        </div>
+        <div class="search-input-wrapper">
+            <span data-lucide="search" class="icon"></span>
+            <input type="text" id="search-input" placeholder="输入关键词…（Esc 关闭）" autocomplete="off">
+        </div>
+        <div id="search-results" class="search-results"></div>
+    </dialog>
+
+    <script type="module" src="/static/app.js?v=20"></script>
 </body>
 </html>

@@ -172,6 +172,10 @@ class DebateEngine:
                     "debater_name": debater.name,
                     "color": debater.color,
                     "avatar": debater.avatar,
+                    "round_number": self.state.current_round,
+                    "total_rounds": self.state.max_rounds,
+                    "turn_index": self.state.current_turn_index,
+                    "total_turns": len(self.state.debaters),
                 },
             )
         )

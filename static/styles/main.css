@@ -1,0 +1,46 @@
+/* ═══════════════════════════════════════════════════════
+   The Salon — AI Debate Chatroom
+   Main stylesheet entry point
+   ═══════════════════════════════════════════════════════ */
+
+@layer tokens, base, layout, components, utilities;
+
+@import url('./tokens.css');
+@import url('./base.css');
+@import url('./layout.css');
+@import url('./components.css');
+@import url('./messages.css');
+@import url('./search.css');
+
+/* ─── View Transitions (theme swap) ──────────────── */
+
+@layer utilities {
+    /* Used for the circular theme reveal */
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation: none;
+        mix-blend-mode: normal;
+    }
+
+    ::view-transition-old(root) {
+        z-index: 1;
+    }
+    ::view-transition-new(root) {
+        z-index: 2;
+        animation: themeReveal var(--duration-slow) var(--ease-out);
+    }
+
+    @keyframes themeReveal {
+        from {
+            clip-path: circle(0% at var(--reveal-x, 100%) var(--reveal-y, 0%));
+        }
+        to {
+            clip-path: circle(150% at var(--reveal-x, 100%) var(--reveal-y, 0%));
+        }
+    }
+
+    /* Utility helpers */
+    .text-muted { color: var(--ink-muted); }
+    .text-soft  { color: var(--ink-soft); }
+    .hidden     { display: none !important; }
+}
