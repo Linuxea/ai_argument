@@ -5,7 +5,7 @@ import time
 import httpx
 from pydantic_ai import RunContext
 
-from app.agents import DebaterDeps
+from app.engine.state import DebaterDeps
 
 BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 MAX_RESULTS = 5

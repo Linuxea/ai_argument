@@ -1,4 +1,7 @@
 # tests/test_debate_engine.py
+import asyncio
+from unittest.mock import MagicMock
+
 import pytest
 
 from app.engine.debate import DebateEngine
@@ -29,6 +32,8 @@ def _make_engine(responses=None):
     engine._loop_task = None
     engine.judge_task = None
     engine._history = {}
+    engine._extraction_tasks = set()
+    engine._consumer_active = False
     return engine, mock
 
 
@@ -65,7 +70,8 @@ def test_build_user_prompt_subsequent_turn():
     # Other speakers should appear
     assert "[Optimist]: AI can enhance learning." in prompt
     assert "[You]: What about special needs?" in prompt
-    assert "Debate topic: AI in education" in prompt
+    # Topic is fenced so injected content can't pose as instructions.
+    assert "<topic>AI in education</topic>" in prompt
 
 
 def test_advance_turn_round_robin():
@@ -128,6 +134,80 @@ def test_start_raises_error_on_empty_debaters():
 
     with pytest.raises(ValueError, match="debaters list cannot be empty"):
         engine.start(topic="Test topic", debaters=[])
+
+
+def test_start_rejects_duplicate_names():
+    """C1: same-named debaters must be rejected at the engine boundary too,
+    not just at the API layer. Otherwise they share one message_history slot
+    and silently talk to themselves."""
+    engine, _ = _make_engine()
+    a = Debater(name="Alice", personality="p")
+    b = Debater(name="Alice", personality="p2")
+    with pytest.raises(ValueError, match="unique names"):
+        engine.start(topic="t", debaters=[a, b])
+
+
+@pytest.mark.asyncio
+async def test_start_cancels_lingering_extraction_tasks():
+    """M11: extraction tasks are fire-and-forget but tracked; start() must
+    cancel stragglers from a prior debate so they don't append stale
+    summaries to the new debate's state."""
+    engine, _ = _make_engine()
+    # Use mocks instead of real tasks so cancellation is synchronous and
+    # observable in the assertion.
+    t1 = MagicMock()
+    t2 = MagicMock()
+    engine._extraction_tasks = {t1, t2}
+
+    a = Debater(name="Alice", personality="p")
+    b = Debater(name="Bob", personality="p")
+    engine.start(topic="t", debaters=[a, b])
+
+    t1.cancel.assert_called_once()
+    t2.cancel.assert_called_once()
+    assert engine._extraction_tasks == set()
+    assert engine._consumer_active is False
+
+
+@pytest.mark.asyncio
+async def test_emit_error_routes_through_emit_and_assigns_event_type():
+    """emit_error is the public terminal-error helper used by routes. It must
+    route through _emit (so replay buffer captures it) and pick the right
+    event type based on the ``judge`` flag."""
+    engine, _ = _make_engine()
+    engine.event_queue = __import__("asyncio").Queue()
+
+    await engine.emit_error("oops", judge=False)
+    await engine.emit_error("judge oops", judge=True)
+
+    events: list = []
+    while not engine.event_queue.empty():
+        events.append(await engine.event_queue.get())
+    types = [e.type for e in events]
+    assert types == ["debate_error", "judge_error"]
+    # Both events got replay-buffer ids (proves they went through _emit).
+    assert all(e.id > 0 for e in events)
+    assert len(engine.event_log) == 2
+
+
+def test_acquire_consumer_enforces_single_slot():
+    """M5: a second concurrent consumer must be rejected so events aren't
+    split between two waiters on event_queue.get()."""
+    engine, _ = _make_engine()
+    assert engine.acquire_consumer() is True   # first caller wins
+    assert engine.acquire_consumer() is False  # second is rejected
+    engine.release_consumer()
+    # Slot is free again.
+    assert engine.acquire_consumer() is True
+    engine.release_consumer()
+
+
+def test_release_consumer_idempotent():
+    """Releasing when not held must not error."""
+    engine, _ = _make_engine()
+    engine.release_consumer()  # no-op
+    engine.release_consumer()  # still no-op
+    assert engine.acquire_consumer() is True
 
 
 def test_start_raises_error_on_zero_max_rounds():
@@ -571,6 +651,10 @@ async def test_run_turn_calls_extract_key_points():
     engine._history = {"Alice": []}
 
     await engine.run_turn()
+    # Extraction runs as a tracked fire-and-forget task; await it before
+    # asserting on its side effects.
+    if engine._extraction_tasks:
+        await asyncio.gather(*engine._extraction_tasks, return_exceptions=True)
 
     assert extractor_mock.call_count == 1
     assert extractor_mock.last_user_prompt is not None
@@ -619,7 +703,9 @@ async def test_run_loop_failure_emits_debate_error():
         events.append(await engine.event_queue.get())
     error_events = [e for e in events if e.type == "debate_error"]
     assert len(error_events) == 1
-    assert "provider down" in error_events[0].payload["message"]
+    # Generic message — provider exception text must not leak.
+    assert "provider down" not in error_events[0].payload["message"]
+    assert error_events[0].payload["message"]
 
 
 async def test_judge_failure_emits_judge_error():
@@ -638,4 +724,6 @@ async def test_judge_failure_emits_judge_error():
         events.append(await engine.event_queue.get())
     error_events = [e for e in events if e.type == "judge_error"]
     assert len(error_events) == 1
-    assert "judge model down" in error_events[0].payload["message"]
+    # Generic message — provider exception text must not leak.
+    assert "judge model down" not in error_events[0].payload["message"]
+    assert error_events[0].payload["message"]

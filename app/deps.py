@@ -60,15 +60,25 @@ def get_settings() -> Settings:
 def get_engine(request: Request) -> DebateEngine:
     """Return the debate engine attached to app.state at startup.
 
-    Raises HTTPException(400) if the engine hasn't been initialised (e.g. when
-    lifespan hasn't run), so every debate route is uniformly guarded.
+    Raises HTTPException(503) if the engine hasn't been initialised (e.g. when
+    lifespan hasn't run yet), so every debate route is uniformly guarded.
+    503 (not 400) is the correct status for "service not ready" per RFC 9110.
     """
     engine: DebateEngine | None = request.app.state.engine
     if engine is None:
-        raise HTTPException(status_code=400, detail="Service not ready")
+        raise HTTPException(status_code=503, detail="Service not ready")
     return engine
 
 
 def get_debater_repository(request: Request) -> DebaterRepository:
-    """Return the custom-debater repository attached to app.state."""
-    return request.app.state.debater_repository
+    """Return the custom-debater repository attached to app.state.
+
+    Same readiness contract as ``get_engine``: 503 if lifespan hasn't seeded
+    the repository yet.
+    """
+    repo: DebaterRepository | None = getattr(
+        request.app.state, "debater_repository", None
+    )
+    if repo is None:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    return repo

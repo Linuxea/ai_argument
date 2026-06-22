@@ -1,8 +1,51 @@
+[project]
+name = "ai-debate-chatroom"
+version = "1.0.0"
+description = "AI-powered debate chatroom with multiple LLM debaters, SSE streaming, and judge mode."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "AI Debate Chatroom" }]
+private = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-filterwarnings = [
-    # pydantic-ai renamed OpenAIModel -> OpenAIChatModel; silence until we migrate.
-    "ignore::DeprecationWarning:agents",
-    "ignore::DeprecationWarning:app.agents",
+addopts = "--cov=app --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",   # line length handled by formatter
+    "B008",   # function call in default argument (FastAPI Depends pattern)
+    "B904",   # raise from in except (sometimes clearer without)
+    "SIM117", # combined isinstance (less readable)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

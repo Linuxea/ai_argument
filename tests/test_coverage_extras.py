@@ -54,6 +54,8 @@ def _bare_engine() -> DebateEngine:
     eng._loop_task = None
     eng.judge_task = None
     eng._history = {}
+    eng._extraction_tasks = set()
+    eng._consumer_active = False
     return eng
 
 
@@ -106,12 +108,18 @@ def test_lifespan_initialises_state(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_make_model_constructs_openai_model():
+def test_make_model_constructs_openai_chat_model():
+    """``_make_model`` returns the post-rename ``OpenAIChatModel`` class.
+
+    The legacy ``OpenAIModel`` alias was deprecated in pydantic-ai 1.7x and
+    removed thereafter; ``OpenAIChatModel`` is the correct class for any
+    OpenAI-compatible Chat Completions endpoint (DeepSeek, Ollama, vLLM, etc.).
+    """
     from app.agents import _make_model
-    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.models.openai import OpenAIChatModel
 
     model = _make_model("gpt-test", base_url="https://api.example.com", api_key="k")
-    assert isinstance(model, OpenAIModel)
+    assert isinstance(model, OpenAIChatModel)
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +171,17 @@ def test_get_engine_raises_when_unset():
     request.app.state.engine = None
     with pytest.raises(HTTPException) as exc_info:
         get_engine(request)
-    assert exc_info.value.status_code == 400
+    assert exc_info.value.status_code == 503
+
+
+def test_get_debater_repository_raises_when_unset():
+    """Repository dep shares the same 503 readiness contract as the engine."""
+    request = MagicMock()
+    # Simulate lifespan not having run.
+    del request.app.state.debater_repository
+    with pytest.raises(HTTPException) as exc_info:
+        get_debater_repository(request)
+    assert exc_info.value.status_code == 503
 
 
 def test_get_debater_repository_returns_state_repo():

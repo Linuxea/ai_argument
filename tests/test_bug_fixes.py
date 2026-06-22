@@ -1,7 +1,10 @@
-"""Regression tests for previously-undiscovered bugs (B1–B25).
+"""Regression tests for the historical bug audit (B1–B33).
 
 Each test is named with the bug id from the audit so future regressions are
-easy to map back to the original failure mode.
+easy to map back to the original failure mode. Note: the original audit
+nominally covers B1–B32, but 11 IDs (B13, B14, B17, B23, B24, B26–B29, B31,
+B32) were either merged into sibling tests or never independently fixed and
+have no dedicated regression test here. B33 is post-audit.
 """
 from __future__ import annotations
 
@@ -61,7 +64,7 @@ def test_b9_max_rounds_in_range_accepted():
 
 
 def _ctx_with_key(api_key: str = "valid-key"):
-    from app.agents import DebaterDeps
+    from app.engine.state import DebaterDeps
 
     ctx = MagicMock()
     ctx.deps = DebaterDeps(
@@ -218,24 +221,27 @@ def _patch_topic_settings(monkeypatch):
     monkeypatch.setattr("app.routes.topic.settings.model", "test")
 
 
-def _fake_openai_returning(content):
-    """Build an AsyncOpenAI mock returning the given content (None allowed)."""
-    response = MagicMock()
-    response.choices = [MagicMock()]
-    response.choices[0].message.content = content
-    client = MagicMock()
-    client.chat.completions.create = AsyncMock(return_value=response)
-    return client
+def _fake_agent_returning(output):
+    """Build a fake PydanticAI Agent whose ``run`` returns ``output``.
+
+    Replaces the pre-M2 ``AsyncOpenAI`` mocking style. ``None`` is allowed so
+    we can test the "model returned nothing" path.
+    """
+    result = MagicMock()
+    result.output = output
+    agent = MagicMock()
+    agent.run = AsyncMock(return_value=result)
+    return agent
 
 
 def test_b3_topic_refine_handles_none_content(monkeypatch):
-    """Model returning content=None must produce a clear 502 message, not
+    """Model returning output=None must produce a clear 502 message, not
     "'NoneType' object has no attribute 'strip'"."""
     _patch_topic_settings(monkeypatch)
-    client = _fake_openai_returning(None)
+    agent = _fake_agent_returning(None)
 
     test_client = TestClient(app)
-    with patch("app.routes.topic.AsyncOpenAI", return_value=client):
+    with patch("app.routes.topic.create_topic_refiner_agent", return_value=agent):
         resp = test_client.post("/api/topic/refine", json={"topic": "话题"})
 
     assert resp.status_code == 502
@@ -247,10 +253,10 @@ def test_b3_topic_refine_handles_none_content(monkeypatch):
 def test_b3_topic_refine_handles_empty_string(monkeypatch):
     """Likewise an empty string after stripping must not look like 'success'."""
     _patch_topic_settings(monkeypatch)
-    client = _fake_openai_returning("   \n  ")
+    agent = _fake_agent_returning("   \n  ")
 
     test_client = TestClient(app)
-    with patch("app.routes.topic.AsyncOpenAI", return_value=client):
+    with patch("app.routes.topic.create_topic_refiner_agent", return_value=agent):
         resp = test_client.post("/api/topic/refine", json={"topic": "话题"})
 
     assert resp.status_code == 502
@@ -258,40 +264,41 @@ def test_b3_topic_refine_handles_empty_string(monkeypatch):
 
 
 def test_b3_topic_refine_handles_no_choices(monkeypatch):
-    """A response with empty choices list should not IndexError."""
+    """A response with empty choices list should not IndexError.
+
+    Post-M2: PydanticAI normalises empty/missing model output to an empty
+    string, so this case collapses with the empty-output path.
+    """
     _patch_topic_settings(monkeypatch)
-    response = MagicMock()
-    response.choices = []
-    client = MagicMock()
-    client.chat.completions.create = AsyncMock(return_value=response)
+    agent = _fake_agent_returning("")
 
     test_client = TestClient(app)
-    with patch("app.routes.topic.AsyncOpenAI", return_value=client):
+    with patch("app.routes.topic.create_topic_refiner_agent", return_value=agent):
         resp = test_client.post("/api/topic/refine", json={"topic": "话题"})
 
     assert resp.status_code == 502
 
 
 def test_b33_topic_refine_length_truncation_message(monkeypatch):
-    """Empty content with finish_reason='length' must surface the truncation
-    cause distinctly — this is the symptom users hit when DeepSeek V4's
-    default thinking mode burns the entire max_tokens budget on reasoning."""
+    """When the model returns empty output (historically because thinking
+    mode burned the max_tokens budget on reasoning), the user sees a clear
+    502 message mentioning the likely cause.
+
+    Post-M2: PydanticAI no longer exposes the raw OpenAI ``finish_reason``
+    field, so we can't distinguish length-truncation from any other empty
+    output. The combined message mentions both possibilities.
+    """
     _patch_topic_settings(monkeypatch)
-    response = MagicMock()
-    response.choices = [MagicMock()]
-    response.choices[0].message.content = ""
-    response.choices[0].finish_reason = "length"
-    client = MagicMock()
-    client.chat.completions.create = AsyncMock(return_value=response)
+    agent = _fake_agent_returning("")
 
     test_client = TestClient(app)
-    with patch("app.routes.topic.AsyncOpenAI", return_value=client):
+    with patch("app.routes.topic.create_topic_refiner_agent", return_value=agent):
         resp = test_client.post("/api/topic/refine", json={"topic": "话题"})
 
     assert resp.status_code == 502
     detail = resp.json()["detail"]
-    assert "token 上限截断" in detail
-    assert "模型未返回话题文本" not in detail
+    # Message must mention the model returned nothing (the union of B3 + B33).
+    assert "模型未返回话题文本" in detail
 
 
 # ---------------------------------------------------------------------------
@@ -548,30 +555,6 @@ async def test_b2_cancellation_emits_debate_paused():
 
 def test_b22_judge_returns_409_when_already_judging():
     """Posting /judge twice in a row must not start two judge tasks."""
-
-    class StubEngine:
-        def __init__(self):
-            self.state = DebateState(
-                topic="t", debaters=[Debater(name="x", personality="p")], active=False
-            )
-            self.event_queue = asyncio.Queue()
-            # Pretend a long-running judge task already exists.
-            loop = asyncio.new_event_loop()
-            try:
-                async def sleeper():
-                    await asyncio.sleep(60)
-                self.judge_task = loop.create_task(sleeper())
-            finally:
-                # Don't actually run the loop; we just need a not-done task
-                # for the route's check. Cancel later.
-                pass
-            self._loop = loop
-
-        async def judge(self):
-            return True
-
-    # We need an actual running event loop for the test to obtain a task that
-    # isn't done. Easier: stub judge_task with a MagicMock(done=lambda: False).
     class CheapStub:
         state = DebateState(
             topic="t", debaters=[Debater(name="x", personality="p")], active=False

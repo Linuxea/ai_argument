@@ -47,6 +47,13 @@ config.local.py
 .worktrees/
 .superpowers/
 
+# Agent / IDE local state
+.claude/
+.opencode/
+
+# Generated artifacts (keep sources, ignore output)
+ai-debate-course/index.html
+
 # Node
 node_modules/
 package-lock.json

@@ -1,7 +1,11 @@
 """Data structures for debate state and the SSE event envelope.
 
 Kept dependency-free (only stdlib + the ``Debater`` model) so it can be
-imported without pulling in the PydanticAI stack.
+imported without pulling in the PydanticAI stack. This is also why
+``DebaterDeps`` lives here: ``app.tools`` needs it for its ``RunContext``
+type parameter, but ``app.agents`` needs ``app.tools`` for the ``web_search``
+tool registration — so the deps dataclass must live in a module that neither
+imports (this one).
 """
 from __future__ import annotations
 
@@ -47,3 +51,19 @@ class Event:
     type: str
     payload: dict[str, Any]
     id: int = 0
+
+
+@dataclass
+class DebaterDeps:
+    """Dependencies injected into each debater agent run.
+
+    Lives here (not in ``app.agents``) so that ``app.tools`` can import it
+    without creating a circular dependency with ``app.agents`` (which lazily
+    imports ``app.tools.web_search`` for tool registration).
+    """
+
+    topic: str
+    debater: Debater
+    round_number: int
+    max_rounds: int | None
+    brave_api_key: str | None = None

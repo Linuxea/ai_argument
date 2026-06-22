@@ -137,11 +137,32 @@ ai_argument/
 │       ├── debaters.py  # /api/presets, /api/debaters
 │       └── topic.py     # /api/topic/refine
 ├── start.sh             # Startup script (install + run)
-├── static/
-│   ├── index.html       # Chat UI (Chinese)
-│   ├── style.css        # Dark theme styling
-│   └── app.js           # SSE handling, DOM updates
-├── tests/               # Unit and integration tests
+├── static/              # Frontend (vanilla ES modules, no build step)
+│   ├── index.html       # App shell (Chinese)
+│   ├── app.js           # DebateApp orchestrator (SSE dispatch, state machine)
+│   ├── favicon.svg
+│   ├── modules/         # ES modules
+│   │   ├── api.js       # fetch calls + error formatting
+│   │   ├── sse.js       # SSEClient (EventSource wrapper)
+│   │   ├── state.js     # UIState FSM
+│   │   ├── markdown.js  # marked config + [[Name]] mention decoration
+│   │   ├── renderer.js  # streaming bubbles, thinking section, tool cards
+│   │   ├── autoscroll.js# IntersectionObserver + floating jump button
+│   │   ├── debaters.js  # debater list render, drag reorder
+│   │   ├── search.js    # <dialog> search with highlight
+│   │   ├── theme.js     # light/dark + View Transitions API
+│   │   ├── toast.js     # capped notification stack
+│   │   └── utils.js     # escapeHtml, sanitizeColor, debounce, icon
+│   └── styles/          # cascade layers
+│       ├── main.css     # layer order + @import hub
+│       ├── tokens.css   # design tokens, dark theme
+│       ├── base.css     # reset, scrollbar, focus ring
+│       ├── layout.css   # sidebar/chat shell + responsive breakpoint
+│       ├── components.css# buttons, inputs, debater items, toasts
+│       ├── messages.css # bubbles, skeleton, cursor, concessions
+│       └── search.css   # search drawer
+├── tests/               # Backend pytest suite (100% coverage enforced)
+└── tests-js/            # Frontend node:test + jsdom suite
 └── .env                 # API configuration (not in repo)
 ```
 
@@ -275,12 +296,18 @@ debaters:
 ## Running Tests
 
 ```bash
-# Run all tests
+# Backend tests (100% coverage enforced via pyproject.toml)
 python -m pytest tests/ -v
+python -m pytest tests/test_debate_engine.py -v          # one file
+python -m pytest tests/ --cov=app --cov-report=term-missing
 
-# Run specific test file
-python -m pytest tests/test_debate_engine.py -v
+# Frontend tests (node:test + jsdom)
+npm test                                                  # all
+node --test tests-js/renderer.test.js                     # one file
 ```
+
+Backend tests use `pytest` with `pytest-asyncio` (auto mode) and `pytest-cov`.
+Frontend tests use the built-in Node test runner with `jsdom` — no build step.
 
 ## Limitations
 

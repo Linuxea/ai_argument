@@ -30,12 +30,19 @@ def test_get_root_serves_html():
 
 
 def test_start_debate_validates_min_debaters():
+    """min_length=2 is enforced at the Pydantic layer (422) before any route logic.
+
+    Runs lifespan so ``app.state.engine`` is set (otherwise we'd hit the 503
+    readiness guard first and never reach the model validator).
+    """
     from main import app
 
-    client = TestClient(app)
+    with TestClient(app):
+        response = app.dependency_overrides  # no-op; lifespan ran on __enter__
+        client = TestClient(app)
+        response = client.post(
+            "/api/debate/start", json={"topic": "Test topic", "debater_names": ["正方"]}
+        )
 
-    response = client.post(
-        "/api/debate/start", json={"topic": "Test topic", "debater_names": ["正方"]}
-    )
-
-    assert response.status_code == 400
+    # min_length=2 enforced at the Pydantic layer → 422.
+    assert response.status_code == 422

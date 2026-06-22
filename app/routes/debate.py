@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -11,6 +12,8 @@ from app.deps import DebaterRepository, get_debater_repository, get_engine
 from app.engine.debate import DebateEngine
 from app.engine.state import Event
 from app.models import DebateConfig, UserMessage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/debate", tags=["debate"])
 
@@ -38,13 +41,16 @@ async def _safe_judge(engine: DebateEngine) -> None:
     internal failure, but this wrapper guarantees a terminal event even if the
     coroutine is cancelled or fails before reaching judge's own try/except —
     so the SSE consumer never hangs.
+
+    The error event is routed through ``engine.emit_error`` (and thus the
+    replay buffer) so reconnecting clients see the terminal state instead of
+    hanging on keepalives.
     """
     try:
         await engine.judge()
-    except Exception as exc:
-        await engine.event_queue.put(
-            Event(type="judge_error", payload={"message": f"评判失败: {exc}"})
-        )
+    except Exception:
+        logger.exception("Safe-judge wrapper caught unexpected error")
+        await engine.emit_error("评判失败，请稍后重试", judge=True)
 
 
 @router.post("/start")
@@ -53,10 +59,12 @@ async def start_debate(
     engine: DebateEngine = Depends(get_engine),
     repository: DebaterRepository = Depends(get_debater_repository),
 ):
-    """Start a new debate."""
-    if len(config.debater_names) < 2:
-        raise HTTPException(status_code=400, detail="At least 2 debaters required")
+    """Start a new debate.
 
+    The ``min_length=2`` and uniqueness invariants are enforced by
+    ``DebateConfig`` itself (Pydantic 422 on violation); this handler only
+    resolves names against the repository.
+    """
     debater_map = {d.name: d for d in repository.list_all()}
     selected = [debater_map[name] for name in config.debater_names if name in debater_map]
 
@@ -80,7 +88,17 @@ async def debate_stream(
     Supports reconnect via the standard ``Last-Event-ID`` header: any events
     buffered in the engine's replay log with id > Last-Event-ID are replayed
     before the live stream resumes.
+
+    Enforces single-consumer semantics: if a stream is already active, a
+    second concurrent connection returns 409 so it cannot silently split
+    events off the queue.
     """
+    if not engine.acquire_consumer():
+        raise HTTPException(
+            status_code=409,
+            detail="A stream is already active; close it before reconnecting.",
+        )
+
     last_id_raw = request.headers.get("last-event-id", "0")
     try:
         last_event_id = int(last_id_raw)
@@ -88,35 +106,38 @@ async def debate_stream(
         last_event_id = 0
 
     async def event_generator():
-        # Replay any missed events first so reconnecting clients don't lose
-        # the chunks emitted during the brief disconnect window.
-        if last_event_id > 0 and engine.state:
-            for ev in engine.events_since(last_event_id):
-                data = json.dumps(ev.payload)
-                yield f"id: {ev.id}\nevent: {ev.type}\ndata: {data}\n\n"
-                if ev.type in TERMINAL_EVENTS:
-                    return
+        try:
+            # Replay any missed events first so reconnecting clients don't lose
+            # the chunks emitted during the brief disconnect window.
+            if last_event_id > 0 and engine.state:
+                for ev in engine.events_since(last_event_id):
+                    data = json.dumps(ev.payload)
+                    yield f"id: {ev.id}\nevent: {ev.type}\ndata: {data}\n\n"
+                    if ev.type in TERMINAL_EVENTS:
+                        return
 
-        # Start debate loop AFTER SSE consumer is connected
-        engine.ensure_loop_running()
+            # Start debate loop AFTER SSE consumer is connected
+            engine.ensure_loop_running()
 
-        while True:
-            if engine.state:
-                try:
-                    event = await asyncio.wait_for(
-                        engine.event_queue.get(),
-                        timeout=30.0,
-                    )
-                    data = json.dumps(event.payload)
-                    id_line = f"id: {event.id}\n" if event.id else ""
-                    yield f"{id_line}event: {event.type}\ndata: {data}\n\n"
+            while True:
+                if engine.state:
+                    try:
+                        event = await asyncio.wait_for(
+                            engine.event_queue.get(),
+                            timeout=30.0,
+                        )
+                        data = json.dumps(event.payload)
+                        id_line = f"id: {event.id}\n" if event.id else ""
+                        yield f"{id_line}event: {event.type}\ndata: {data}\n\n"
 
-                    if event.type in TERMINAL_EVENTS:
-                        break
-                except asyncio.TimeoutError:
-                    yield ": keepalive\n\n"
-            else:
-                break
+                        if event.type in TERMINAL_EVENTS:
+                            break
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
+                else:
+                    break
+        finally:
+            engine.release_consumer()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
