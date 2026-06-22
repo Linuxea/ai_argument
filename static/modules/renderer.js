@@ -123,7 +123,10 @@ export class MessageRenderer {
         this._lastSpeakerName = debater.name;
         this._lastSpeakerType = 'debater';
 
-        this.scroller.schedule();
+        // Counted: a new bubble counts as "1 new message" for the unseen
+        // badge. Subsequent chunks within this bubble are NOT counted so the
+        // badge doesn't inflate to 99+ during a single debater's streaming.
+        this.scroller.schedule({ counted: true });
     }
 
     _removeSkeleton() {
@@ -135,8 +138,15 @@ export class MessageRenderer {
     /** Ensure we have a container (in case start event was missed). */
     _ensureContainer() {
         if (!this.currentMessageContainer) {
-            this.startDebaterTurn(this.currentDebater || { name: 'Unknown', color: '#333333', avatar: '💬' });
+            if (!this.currentDebater) {
+                // No prior startDebaterTurn — refuse to silently attribute the
+                // chunk to a stale debater. Caller will see appendChunk()
+                // become a no-op until a proper debater_start event arrives.
+                return false;
+            }
+            this.startDebaterTurn(this.currentDebater);
         }
+        return true;
     }
 
     _ensureContentEl() {
@@ -152,7 +162,7 @@ export class MessageRenderer {
     /** Append a streamed text chunk. Renders in next rAF. */
     appendChunk(text) {
         if (!text) return;
-        this._ensureContainer();
+        if (!this._ensureContainer()) return;
         this._ensureContentEl();
         const prev = this.currentMessageEl.dataset.raw || '';
         this.currentMessageEl.dataset.raw = prev + text;
@@ -163,7 +173,7 @@ export class MessageRenderer {
     /** Append a streamed thinking chunk. */
     appendThinking(text) {
         if (!text) return;
-        this._ensureContainer();
+        if (!this._ensureContainer()) return;
         this._removeSkeleton();
 
         if (!this.currentThinkingEl) {
@@ -236,6 +246,9 @@ export class MessageRenderer {
                 inner.textContent = inner.dataset.raw || '';
                 this._pendingThinkingRender = false;
             }
+            // Not counted: the new-message bump for this bubble happened in
+            // ``startDebaterTurn``; subsequent chunks update content within
+            // the same bubble and shouldn't bump the unseen-message badge.
             this.scroller.schedule();
         });
     }
@@ -243,10 +256,11 @@ export class MessageRenderer {
     /** Finalize the active message (called at debater_finalize / debater_end). */
     finalize() {
         // Collapse thinking section
+        let thinkingHasContent = false;
         if (this.currentThinkingEl) {
             const inner = this.currentThinkingEl.querySelector('.thinking-text-inner');
-            const hasThinking = (inner?.dataset.raw || '').trim();
-            if (hasThinking) {
+            thinkingHasContent = !!(inner?.dataset.raw || '').trim();
+            if (thinkingHasContent) {
                 const text = this.currentThinkingEl.querySelector('.thinking-text');
                 const toggle = this.currentThinkingEl.querySelector('.thinking-toggle');
                 const label = this.currentThinkingEl.querySelector('.thinking-label');
@@ -256,24 +270,22 @@ export class MessageRenderer {
                 label.textContent = '思考过程';
                 header?.setAttribute('aria-expanded', 'false');
             } else {
-                // No thinking text — remove the empty section
                 this.currentThinkingEl.remove();
+                this.currentThinkingEl = null;
             }
         }
 
         // Final markdown render (drop cursor)
         if (this.currentMessageEl) {
             const raw = this.currentMessageEl.dataset.raw || '';
-            if (!raw.trim() && !this.currentThinkingEl) {
-                // No content at all — remove the whole message container
+            if (!raw.trim() && !thinkingHasContent) {
                 this.currentMessageContainer?.remove();
             } else {
                 this.currentMessageEl.innerHTML = renderMarkdown(raw);
             }
         } else if (this.currentMessageContainer) {
-            // Container exists but no content arrived
-            if (this.currentMessageContainer.querySelector('[data-skeleton]')) {
-                // Only skeleton — drop it
+            const onlySkeleton = !!this.currentMessageContainer.querySelector('[data-skeleton]');
+            if (onlySkeleton || !thinkingHasContent) {
                 this.currentMessageContainer.remove();
             }
         }
@@ -283,6 +295,17 @@ export class MessageRenderer {
         this.currentThinkingEl = null;
         this._pendingTextRender = false;
         this._pendingThinkingRender = false;
+        // Note: `currentDebater` is intentionally preserved so the speaker
+        // identity survives across the finalize→tool_call→appendChunk sequence
+        // inside a single turn. ``endTurn()`` (called on debater_end) clears
+        // it explicitly to prevent stale-attribution bugs across turns.
+    }
+
+    /** Hard end-of-turn: like finalize() but also forgets the debater identity
+     * so subsequent stray chunks don't get attributed to them. */
+    endTurn() {
+        this.finalize();
+        this.currentDebater = null;
     }
 
     /** Add a system notice line. */

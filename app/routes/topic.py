@@ -41,8 +41,20 @@ async def refine_topic(request: RefineTopicRequest):
             max_tokens=200,
             temperature=0.7,
         )
-        refined_topic = response.choices[0].message.content.strip()
+        choice = response.choices[0] if response.choices else None
+        content = (choice.message.content if choice and choice.message else None) or ""
+        refined_topic = content.strip()
+        if not refined_topic:
+            # Model returned empty content (content filter, tool-only response,
+            # or reasoning model that didn't emit text). Don't crash with a
+            # misleading 502 — tell the user plainly.
+            raise HTTPException(
+                status_code=502,
+                detail="模型未返回话题文本，请稍后重试或换个表述",
+            )
         return {"refined_topic": refined_topic}
+    except HTTPException:
+        raise
     except AuthenticationError:
         raise HTTPException(status_code=401, detail="API Key 无效")
     except NotFoundError:

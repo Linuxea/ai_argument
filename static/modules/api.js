@@ -1,4 +1,41 @@
 // api.js — all backend HTTP calls in one place
+
+/**
+ * Convert a FastAPI/Pydantic error `detail` value into a readable string.
+ *
+ * `detail` may be:
+ *   - a string (custom HTTPException) — pass through
+ *   - an array of validation errors (Pydantic):
+ *       [{ type, loc: [...], msg, ... }, ...]
+ *   - a non-array object — JSON-stringify rather than .toString()ing it
+ *
+ * Without this, `new Error([{...}, {...}])` collapses to the infamous
+ * "[object Object],[object Object]" message.
+ */
+function formatErrorDetail(detail) {
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+        const parts = detail.map((item) => {
+            if (typeof item === 'string') return item;
+            if (item && typeof item === 'object') {
+                const msg = item.msg || item.message || '';
+                const loc = Array.isArray(item.loc) ? item.loc.filter(
+                    (s) => s !== 'body' && s !== 'query' && s !== 'path',
+                ).join('.') : '';
+                if (msg && loc) return `${loc}: ${msg}`;
+                if (msg) return msg;
+                try { return JSON.stringify(item); } catch { return String(item); }
+            }
+            return String(item);
+        });
+        return parts.join('; ');
+    }
+    if (detail && typeof detail === 'object') {
+        try { return JSON.stringify(detail); } catch { return String(detail); }
+    }
+    return String(detail ?? '');
+}
+
 async function call(method, path, body = null) {
     const opts = { method, headers: {} };
     if (body !== null) {
@@ -10,8 +47,10 @@ async function call(method, path, body = null) {
         let detail = `${res.status} ${res.statusText}`;
         try {
             const data = await res.json();
-            if (data?.detail) detail = data.detail;
-        } catch { /* ignore */ }
+            if (data?.detail !== undefined && data?.detail !== null) {
+                detail = formatErrorDetail(data.detail);
+            }
+        } catch { /* non-JSON or empty body — keep status fallback */ }
         const err = new Error(detail);
         err.status = res.status;
         throw err;
@@ -31,3 +70,6 @@ export const api = {
     createDebater: (payload) => call('POST', '/api/debaters', payload),
     refineTopic: (topic) => call('POST', '/api/topic/refine', { topic }),
 };
+
+// Exported for testing only. Not part of the public API.
+export { formatErrorDetail };

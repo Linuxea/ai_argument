@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.deps import DebaterRepository, get_debater_repository, get_engine
@@ -22,6 +22,13 @@ TERMINAL_EVENTS = (
     "debate_error",
     "judge_error",
 )
+
+
+# Strong references to background judge tasks. Without this, the only ref to
+# the task is the one held by the event loop's weak set, which means GC can
+# collect (and silently cancel) a long-running task mid-flight.
+# See https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
+_BACKGROUND_TASKS: set[asyncio.Task[None]] = set()
 
 
 async def _safe_judge(engine: DebateEngine) -> None:
@@ -56,14 +63,40 @@ async def start_debate(
     if len(selected) != len(config.debater_names):
         raise HTTPException(status_code=400, detail="Invalid debater name")
 
-    engine.start(config.topic, selected, config.max_rounds)
+    try:
+        engine.start(config.topic, selected, config.max_rounds)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     return {"status": "started", "topic": config.topic}
 
 
 @router.get("/stream")
-async def debate_stream(engine: DebateEngine = Depends(get_engine)):
-    """SSE endpoint for streaming debate events."""
+async def debate_stream(
+    request: Request,
+    engine: DebateEngine = Depends(get_engine),
+):
+    """SSE endpoint for streaming debate events.
+
+    Supports reconnect via the standard ``Last-Event-ID`` header: any events
+    buffered in the engine's replay log with id > Last-Event-ID are replayed
+    before the live stream resumes.
+    """
+    last_id_raw = request.headers.get("last-event-id", "0")
+    try:
+        last_event_id = int(last_id_raw)
+    except (TypeError, ValueError):
+        last_event_id = 0
+
     async def event_generator():
+        # Replay any missed events first so reconnecting clients don't lose
+        # the chunks emitted during the brief disconnect window.
+        if last_event_id > 0 and engine.state:
+            for ev in engine.events_since(last_event_id):
+                data = json.dumps(ev.payload)
+                yield f"id: {ev.id}\nevent: {ev.type}\ndata: {data}\n\n"
+                if ev.type in TERMINAL_EVENTS:
+                    return
+
         # Start debate loop AFTER SSE consumer is connected
         engine.ensure_loop_running()
 
@@ -75,7 +108,8 @@ async def debate_stream(engine: DebateEngine = Depends(get_engine)):
                         timeout=30.0,
                     )
                     data = json.dumps(event.payload)
-                    yield f"event: {event.type}\ndata: {data}\n\n"
+                    id_line = f"id: {event.id}\n" if event.id else ""
+                    yield f"{id_line}event: {event.type}\ndata: {data}\n\n"
 
                     if event.type in TERMINAL_EVENTS:
                         break
@@ -128,5 +162,11 @@ async def judge_debate(engine: DebateEngine = Depends(get_engine)):
     if engine.state.active:
         raise HTTPException(status_code=400, detail="Please stop the debate before requesting a judgment")
 
-    asyncio.create_task(_safe_judge(engine))
+    if engine.judge_task and not engine.judge_task.done():
+        raise HTTPException(status_code=409, detail="Judgment already in progress")
+
+    task = asyncio.create_task(_safe_judge(engine))
+    engine.judge_task = task
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
     return {"status": "judging"}

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 
 from pydantic_ai import (
     AgentRunResultEvent,
@@ -32,6 +33,34 @@ from app.models import ArgumentSummary, Debater
 logger = logging.getLogger(__name__)
 
 
+_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
+
+
+def _parse_extractor_output(raw: str) -> dict:
+    """Parse the extractor's output, tolerating markdown fences + trailing prose.
+
+    Some models wrap JSON in ```json ... ``` or add explanatory text before/after.
+    We try (1) plain json, (2) stripping markdown fences, (3) the first {...}
+    object found in the string. Returns {} on any failure so callers can
+    treat 'no claims' as the safe fallback.
+    """
+    if not raw:
+        return {}
+    candidates = [raw, _FENCE_RE.sub("", raw).strip()]
+    # Also try the first {...} object in the string.
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if match:
+        candidates.append(match.group(0))
+    for text in candidates:
+        try:
+            value = json.loads(text)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
 class DebateEngine:
     """Core debate logic: state management, message building, turn order.
 
@@ -56,9 +85,41 @@ class DebateEngine:
         self._extractor_agent = create_extractor_agent(model, base_url, api_key)
         self.state: DebateState | None = None
         self.event_queue: asyncio.Queue[Event] = asyncio.Queue()
+        # Replay buffer: keeps the last N emitted events so SSE clients can
+        # reconnect via Last-Event-ID without losing data.
+        self.event_log: list[Event] = []
+        self._event_log_max = 500
+        self._next_event_id = 1
         self._loop_task: asyncio.Task[None] | None = None
+        self.judge_task: asyncio.Task[None] | None = None
         # Per-debater PydanticAI message history (keyed by debater name)
         self._history: dict[str, list[ModelMessage]] = {}
+
+    async def _emit(self, event: Event) -> None:
+        """Assign an id, append to the replay log, and enqueue the event.
+
+        All engine-internal SSE emissions should go through this helper so
+        replays via Last-Event-ID stay consistent. External callers (e.g.
+        routes that emit terminal error events on background-task failure)
+        may put directly on the queue; those events get id=0 and are not
+        replayed (they're terminal anyway).
+        """
+        event.id = self._next_event_id
+        self._next_event_id += 1
+        self.event_log.append(event)
+        if len(self.event_log) > self._event_log_max:
+            # Drop oldest. Clients that reconnect after dropping out of the
+            # window get a partial replay (newest 500 events) — better than
+            # nothing, and the loss is logged on the client.
+            del self.event_log[:-self._event_log_max]
+        await self.event_queue.put(event)
+
+    def events_since(self, last_id: int) -> list[Event]:
+        """Return buffered events with id > ``last_id`` for SSE reconnects."""
+        if last_id <= 0:
+            return []
+        # Linear scan is fine; buffer is bounded at 500.
+        return [e for e in self.event_log if e.id > last_id]
 
     def start(
         self,
@@ -70,15 +131,21 @@ class DebateEngine:
 
         Raises:
             ValueError: If debaters list is empty or max_rounds is not positive.
+            RuntimeError: If a debate is currently active. Caller must stop the
+                existing debate first so its SSE consumer terminates cleanly.
         """
         if not debaters:
             raise ValueError("debaters list cannot be empty")
         if max_rounds is not None and max_rounds <= 0:
             raise ValueError("max_rounds must be greater than 0")
+        if self.state and self.state.active:
+            raise RuntimeError("a debate is already running; stop it first")
 
-        # Cancel any running loop task to prevent ghost tasks
+        # Cancel any leftover task from a previously-paused/finished debate.
         if self._loop_task and not self._loop_task.done():
             self._loop_task.cancel()
+        if self.judge_task and not self.judge_task.done():
+            self.judge_task.cancel()
 
         self.state = DebateState(
             topic=topic,
@@ -86,7 +153,10 @@ class DebateEngine:
             max_rounds=max_rounds,
         )
         self.event_queue = asyncio.Queue()
+        self.event_log = []
+        self._next_event_id = 1
         self._loop_task = None
+        self.judge_task = None
         self._history = {d.name: [] for d in debaters}
 
     def ensure_loop_running(self) -> None:
@@ -100,14 +170,28 @@ class DebateEngine:
         Any exception from the loop (e.g. an LLM provider error mid-stream)
         is captured and surfaced as a ``debate_error`` terminal SSE event so
         the connected client is never left waiting on keepalives forever.
+
+        A ``CancelledError`` (raised by ``stop()`` mid-turn) is treated as a
+        graceful pause: we emit ``debate_paused`` and swallow the exception
+        so the asyncio runtime doesn't log "Task exception was never retrieved".
         """
         try:
             await self.run_loop()
+        except asyncio.CancelledError:
+            if self.state:
+                self.state.active = False
+            await self._emit(
+                Event(type="debate_paused", payload={"reason": "Stopped by user"})
+            )
+            # Don't re-raise: cancellation is a user-driven, expected outcome
+            # here. Re-raising would propagate to whoever awaits the task and
+            # produce an "Task was destroyed but it is pending!" warning in
+            # some asyncio configurations.
         except Exception as exc:
             logger.exception("Debate loop failed")
             if self.state:
                 self.state.active = False
-            await self.event_queue.put(
+            await self._emit(
                 Event(
                     type="debate_error",
                     payload={"message": f"辩论过程中出错: {exc}"},
@@ -165,7 +249,7 @@ class DebateEngine:
             brave_api_key=self.brave_api_key,
         )
 
-        await self.event_queue.put(
+        await self._emit(
             Event(
                 type="debater_start",
                 payload={
@@ -181,7 +265,9 @@ class DebateEngine:
         )
 
         full_text = ""
-        current_query = ""
+        # Per tool_call_id query buffer. Using a dict (not a single string)
+        # so concurrent / interleaved tool calls don't overwrite each other.
+        pending_tool_queries: dict[str, str] = {}
         result_all_messages = None
         _thinking_active = False
 
@@ -198,7 +284,7 @@ class DebateEngine:
                 initial_content = event.part.content
                 if initial_content:
                     full_text += initial_content
-                    await self.event_queue.put(
+                    await self._emit(
                         Event(
                             type="debater_chunk",
                             payload={
@@ -212,7 +298,7 @@ class DebateEngine:
                 _thinking_active = True
                 initial = event.part.content
                 if initial:
-                    await self.event_queue.put(Event(
+                    await self._emit(Event(
                         type="thinking_chunk",
                         payload={"debater_name": debater.name, "text_chunk": initial},
                     ))
@@ -220,7 +306,7 @@ class DebateEngine:
                 _thinking_active = await self._end_thinking(_thinking_active)
                 delta = event.delta.content_delta
                 full_text += delta
-                await self.event_queue.put(
+                await self._emit(
                     Event(
                         type="debater_chunk",
                         payload={
@@ -232,7 +318,7 @@ class DebateEngine:
             # Handle PartDeltaEvent — ThinkingPartDelta
             elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, ThinkingPartDelta):
                 delta = event.delta.content_delta
-                await self.event_queue.put(Event(
+                await self._emit(Event(
                     type="thinking_chunk",
                     payload={"debater_name": debater.name, "text_chunk": delta},
                 ))
@@ -243,18 +329,21 @@ class DebateEngine:
                         args = json.loads(args)
                     except (json.JSONDecodeError, TypeError):
                         args = {}
-                current_query = args.get("query", "") if isinstance(args, dict) else ""
-                await self.event_queue.put(Event(type="debater_finalize", payload={}))
+                query = args.get("query", "") if isinstance(args, dict) else ""
+                pending_tool_queries[getattr(event.part, "tool_call_id", "") or ""] = query
+                await self._emit(Event(type="debater_finalize", payload={}))
             elif isinstance(event, FunctionToolResultEvent):
                 result_text = ""
                 if event.result and event.result.content:
                     result_text = str(event.result.content)[:200]
-                await self.event_queue.put(Event(
+                call_id = getattr(event, "tool_call_id", "") or ""
+                query = pending_tool_queries.pop(call_id, "")
+                await self._emit(Event(
                     type="tool_call",
                     payload={
                         "debater_name": debater.name,
                         "tool_name": "web_search",
-                        "query": current_query,
+                        "query": query,
                         "result_summary": result_text,
                     },
                 ))
@@ -269,7 +358,7 @@ class DebateEngine:
             self._history[debater.name] = result_all_messages
         self.state.history.append(Message(speaker=debater.name, content=full_text))
 
-        await self.event_queue.put(
+        await self._emit(
             Event(
                 type="debater_end",
                 payload={
@@ -299,7 +388,7 @@ class DebateEngine:
         thinking→response transition that previously was copy-pasted inline.
         """
         if thinking_active:
-            await self.event_queue.put(Event(type="debater_finalize", payload={}))
+            await self._emit(Event(type="debater_finalize", payload={}))
         return False
 
     async def run_loop(self) -> None:
@@ -309,7 +398,7 @@ class DebateEngine:
 
             # Check for round end
             if self.state.current_turn_index == 0 and self.state.current_round > 0:
-                await self.event_queue.put(
+                await self._emit(
                     Event(
                         type="round_end",
                         payload={"round_number": self.state.current_round},
@@ -319,7 +408,7 @@ class DebateEngine:
                 # Check max rounds
                 if self.state.max_rounds and self.state.current_round >= self.state.max_rounds:
                     self.state.active = False
-                    await self.event_queue.put(
+                    await self._emit(
                         Event(
                             type="debate_end",
                             payload={"reason": "Max rounds reached"},
@@ -328,7 +417,7 @@ class DebateEngine:
                     return
 
         if self.state:
-            await self.event_queue.put(
+            await self._emit(
                 Event(
                     type="debate_paused",
                     payload={"reason": "Stopped by user"},
@@ -343,11 +432,22 @@ class DebateEngine:
         return False
 
     def stop(self) -> bool:
-        """Pause the debate."""
-        if self.state:
-            self.state.active = False
-            return True
-        return False
+        """Pause the debate.
+
+        Also cancels the in-flight ``run_turn``/``run_loop`` task so the user
+        sees the debate pause within a few hundred ms rather than waiting for
+        the model to finish streaming the current turn.
+
+        The cancellation propagates through ``_run_loop_and_cleanup``'s
+        ``finally`` clause, which still emits the ``debate_paused`` terminal
+        event so the SSE consumer can exit cleanly.
+        """
+        if not self.state:
+            return False
+        self.state.active = False
+        if self._loop_task and not self._loop_task.done():
+            self._loop_task.cancel()
+        return True
 
     def resume(self) -> bool:
         """Resume a paused debate.
@@ -376,12 +476,15 @@ class DebateEngine:
         try:
             prompt = f"Speaker: {debater_name}\n\n{full_text}"
             result = await self._extractor_agent.run(prompt)
-            data = json.loads(result.output)
-            points = data.get("points", [])
-            if points:
-                self.state.argument_summaries.append(
-                    ArgumentSummary(round=round_number, debater_name=debater_name, points=points)
-                )
+            data = _parse_extractor_output(result.output)
+            points = data.get("points", []) if isinstance(data, dict) else []
+            if isinstance(points, list) and points:
+                # Defensive: keep only string points and trim.
+                clean = [str(p).strip() for p in points if str(p).strip()]
+                if clean:
+                    self.state.argument_summaries.append(
+                        ArgumentSummary(round=round_number, debater_name=debater_name, points=clean)
+                    )
         except Exception:
             # Non-fatal: argument summaries enhance cross-round memory but
             # are not required for the debate to continue. Log so a silent
@@ -411,7 +514,7 @@ class DebateEngine:
             async with self.judge_agent.run_stream(transcript) as result:
                 async for delta in result.stream_text(delta=True):
                     full_text += delta
-                    await self.event_queue.put(
+                    await self._emit(
                         Event(
                             type="judge_chunk",
                             payload={"text_chunk": delta},
@@ -419,7 +522,7 @@ class DebateEngine:
                     )
         except Exception as exc:
             logger.exception("Judge generation failed")
-            await self.event_queue.put(
+            await self._emit(
                 Event(
                     type="judge_error",
                     payload={"message": f"评判失败: {exc}"},
@@ -427,7 +530,7 @@ class DebateEngine:
             )
             return False
 
-        await self.event_queue.put(
+        await self._emit(
             Event(
                 type="judge_result",
                 payload={"judgment_text": full_text},

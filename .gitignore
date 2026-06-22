@@ -46,3 +46,7 @@ config.local.py
 # Worktrees
 .worktrees/
 .superpowers/
+
+# Node
+node_modules/
+package-lock.json

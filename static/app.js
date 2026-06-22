@@ -20,6 +20,9 @@ class DebateApp {
         this.totalRounds = 10;
         this.currentRound = 0;
         this.currentSpeaker = null;
+        // Auto-judge timer reference so we can cancel it if the user navigates
+        // away or starts a new debate before it fires.
+        this._autoJudgeTimer = null;
         this.init();
     }
 
@@ -46,7 +49,7 @@ class DebateApp {
         if (stored && parseInt(stored, 10) > 0) {
             this.maxRoundsInput.value = stored;
         }
-        this.maxRounds = parseInt(this.maxRoundsInput.value, 10) || 10;
+        this.maxRounds = this._readMaxRounds();
 
         await this._loadDebaters();
         this._applyUIState('idle');
@@ -189,6 +192,18 @@ class DebateApp {
         }
     }
 
+    _readMaxRounds() {
+        const v = parseInt(this.maxRoundsInput.value, 10);
+        return Number.isFinite(v) && v > 0 ? v : 10;
+    }
+
+    _cancelAutoJudge() {
+        if (this._autoJudgeTimer !== null) {
+            clearTimeout(this._autoJudgeTimer);
+            this._autoJudgeTimer = null;
+        }
+    }
+
     async _startDebate() {
         const topic = this.topicInput.value.trim();
         if (!topic) {
@@ -203,7 +218,10 @@ class DebateApp {
             return;
         }
 
-        const maxRounds = parseInt(this.maxRoundsInput.value, 10) || 10;
+        // Cancel any pending auto-judge from a previous debate.
+        this._cancelAutoJudge();
+
+        const maxRounds = this._readMaxRounds();
         this.maxRounds = maxRounds;
         this.totalRounds = maxRounds;
 
@@ -359,7 +377,7 @@ class DebateApp {
                 break;
 
             case 'debater_end':
-                this.renderer.finalize();
+                this.renderer.endTurn();
                 break;
 
             case 'tool_call':
@@ -388,8 +406,15 @@ class DebateApp {
                 this.renderer.addSystem(`辩论结束：${reasonMap[data.reason] || data.reason}`);
                 this._setRoundProgress(this.totalRounds, this.totalRounds, null);
                 if (data.reason === 'Max rounds reached') {
-                    // Auto-judge
-                    setTimeout(() => this._requestJudge(), 400);
+                    // Auto-judge after a short delay. Track the timer so we
+                    // can cancel it if the user starts a new debate or
+                    // navigates away before it fires.
+                    this._cancelAutoJudge();
+                    this._autoJudgeTimer = setTimeout(() => {
+                        this._autoJudgeTimer = null;
+                        // Sanity check the state in case it changed during the delay.
+                        if (this.state.is('stopped')) this._requestJudge();
+                    }, 400);
                 }
                 break;
             }
@@ -430,8 +455,8 @@ class DebateApp {
         } else {
             this.currentSpeakerEl.textContent = '等待开始…';
         }
-        this.roundBadgeEl.textContent = `第 ${Math.min(current + (speakerName ? 0 : 0), total)} / ${total} 轮`;
-        // Clearer math: show current round (1-based when speaker active) or completed count
+        // Show 1-based round while a speaker is active (round 1 of N), or the
+        // completed-round count when between rounds.
         const displayRound = speakerName ? Math.max(1, current) : current;
         this.roundBadgeEl.textContent = `第 ${displayRound} / ${total} 轮`;
     }

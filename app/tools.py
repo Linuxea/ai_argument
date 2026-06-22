@@ -54,14 +54,28 @@ async def web_search(ctx: RunContext[DebaterDeps], query: str) -> str:
                 params={"q": query, "count": MAX_RESULTS},
             )
             response.raise_for_status()
-            data = response.json()
+            try:
+                data = response.json()
+            except ValueError as e:
+                # Brave sometimes returns HTML (auth pages, Cloudflare interstitials,
+                # maintenance) with a 200 status. Don't crash the whole debate.
+                return f"Search failed: invalid response ({e}). Proceed without search results."
     except httpx.HTTPError as e:
         return f"Search failed: {e}. Proceed without search results."
+
+    if not isinstance(data, dict):
+        return "Search failed: unexpected response shape. Proceed without search results."
 
     results = []
     total_chars = 0
     for item in data.get("web", {}).get("results", []):
-        snippet = f"- {item['title']}: {item.get('description', '')}"
+        if not isinstance(item, dict):
+            continue
+        title = item.get("title") or ""
+        description = item.get("description") or ""
+        if not title and not description:
+            continue
+        snippet = f"- {title}: {description}"
         if total_chars + len(snippet) > MAX_TOTAL_CHARS:
             break
         results.append(snippet)

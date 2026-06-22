@@ -44,11 +44,19 @@ export function renderMarkdown(raw) {
     }
 
     try {
-        // Protect [[Name]] mentions from marked's link-ref handling.
+        // Protect [[Name]] mentions from marked's link-ref handling, and
+        // detect [退让]...[/退让] blocks before markdown processing so we can
+        // decide whether to wrap them inline (single-line) or as a block
+        // (multi-paragraph) — span/p nesting violates HTML.
         const mentions = [];
-        const sanitized = String(raw).replace(/\[\[([^\]]+)\]\]/g, (_, name) => {
+        const concessions = [];
+        let sanitized = String(raw).replace(/\[\[([^\]]+)\]\]/g, (_, name) => {
             mentions.push(name);
             return `\u0000MENTION_${mentions.length - 1}\u0000`;
+        });
+        sanitized = sanitized.replace(/\[退让\]([\s\S]*?)\[\/退让\]/g, (_, text) => {
+            concessions.push(text);
+            return `\u0000CONCESSION_${concessions.length - 1}\u0000`;
         });
 
         let html = window.marked.parse(sanitized);
@@ -58,9 +66,27 @@ export function renderMarkdown(raw) {
             return `<span class="mention">${escapeHtml(name)}</span>`;
         });
 
-        html = html.replace(/\[退让\]([\s\S]*?)\[\/退让\]/g, (_, text) =>
-            `<span class="concession">${text}</span>`,
-        );
+        html = html.replace(/\u0000CONCESSION_(\d+)\u0000/g, (_, i) => {
+            const text = concessions[parseInt(i, 10)] ?? '';
+            // The concession's own content may contain mention placeholders;
+            // expand them first so the inner markdown pass sees the final
+            // text and doesn't mangle them as link references.
+            const expanded = text.replace(/\u0000MENTION_(\d+)\u0000/g, (_m, j) => {
+                const name = mentions[parseInt(j, 10)] ?? '';
+                return `<span class="mention">${escapeHtml(name)}</span>`;
+            });
+            const inner = window.marked.parse(expanded);
+            // If marked produced a single <p>…</p> with no nested block tags,
+            // render inline as <span>; otherwise wrap as a block <div> so
+            // the resulting HTML stays valid (spans cannot contain blocks).
+            const blockTagRe = /<(p|div|ul|ol|li|h\d|blockquote|pre|table|hr)\b/i;
+            const trimmed = inner.trim();
+            const single = trimmed.match(/^<p>([\s\S]*)<\/p>$/);
+            if (single && !blockTagRe.test(single[1])) {
+                return `<span class="concession">${single[1]}</span>`;
+            }
+            return `<div class="concession concession-block">${inner}</div>`;
+        });
 
         return html;
     } catch (err) {

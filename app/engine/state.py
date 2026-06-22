@@ -37,7 +37,13 @@ class DebateState:
 
 @dataclass
 class Event:
-    """SSE event structure."""
+    """SSE event structure.
+
+    ``id`` is assigned by the engine when the event is queued; clients may
+    pass ``Last-Event-ID`` on reconnect to request replay of events emitted
+    since that id (see ``app.routes.debate.debate_stream``).
+    """
 
     type: str
     payload: dict[str, Any]
+    id: int = 0

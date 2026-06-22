@@ -23,7 +23,11 @@ def _make_engine(responses=None):
     engine._extractor_agent = MockDebateAgent(responses=['{"points": ["mock claim"]}'])
     engine.state = None
     engine.event_queue = asyncio.Queue()
+    engine.event_log = []
+    engine._event_log_max = 500
+    engine._next_event_id = 1
     engine._loop_task = None
+    engine.judge_task = None
     engine._history = {}
     return engine, mock
 

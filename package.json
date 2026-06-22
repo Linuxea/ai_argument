@@ -1,0 +1,13 @@
+{
+  "name": "ai-debate-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend tests for The Salon AI debate chatroom",
+  "scripts": {
+    "test": "node --test 'tests-js/*.test.js'"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  }
+}

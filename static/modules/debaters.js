@@ -14,6 +14,26 @@ export class DebaterList {
         this.render();
     }
 
+    /**
+     * Capture the current user-controlled state (checkbox state, DOM order)
+     * before a re-render so we can restore it. Without this, adding a custom
+     * debater or any other re-render call wipes the user's selections and
+     * drag-arranged order.
+     */
+    _captureUserState() {
+        const items = this.container.querySelectorAll('.debater-item');
+        if (!items.length) return null;
+        const checked = new Map();
+        const order = [];
+        for (const el of items) {
+            const name = el.dataset.name;
+            order.push(name);
+            const cb = el.querySelector('input[type="checkbox"]');
+            if (cb) checked.set(name, cb.checked);
+        }
+        return { checked, order };
+    }
+
     getSelected() {
         const checked = this.container.querySelectorAll('input[type="checkbox"]:checked');
         return Array.from(checked).map((cb) => cb.value);
@@ -29,11 +49,33 @@ export class DebaterList {
         // Don't repaint while user is dragging — would invalidate references
         if (this._draggedItem || this._kbdGrabbed) return;
 
+        const prev = this._captureUserState();
         this.container.innerHTML = '';
 
+        // Build a name->item map from the new debater list.
+        const newItems = new Map();
         for (const d of this.debaters) {
-            const item = this._renderItem(d);
-            this.container.appendChild(item);
+            newItems.set(d.name, this._renderItem(d));
+        }
+
+        // Replay the previous order for any names that still exist; newly-added
+        // debaters are appended at the end in the order they appear in the
+        // input list.
+        const placed = new Set();
+        if (prev) {
+            for (const name of prev.order) {
+                const item = newItems.get(name);
+                if (!item) continue;
+                this.container.appendChild(item);
+                // Restore the user's checkbox state.
+                const cb = item.querySelector('input[type="checkbox"]');
+                if (cb && prev.checked.has(name)) cb.checked = prev.checked.get(name);
+                placed.add(name);
+            }
+        }
+        for (const d of this.debaters) {
+            if (placed.has(d.name)) continue;
+            this.container.appendChild(newItems.get(d.name));
         }
         refreshIcons();
     }

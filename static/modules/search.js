@@ -145,9 +145,17 @@ export class SearchPanel {
     }
 
     _jumpTo(el) {
+        // Clear any pending un-highlight timers from previous jumps so a
+        // rapid second click doesn't strip the highlight we're about to add.
+        if (this._highlightTimers) {
+            for (const t of this._highlightTimers) clearTimeout(t);
+        }
+        this._highlightTimers = [];
+
         this.messagesContainer.querySelectorAll('.message.highlight').forEach((n) => n.classList.remove('highlight'));
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.add('highlight');
-        setTimeout(() => el.classList.remove('highlight'), 2000);
+        const t = setTimeout(() => el.classList.remove('highlight'), 2000);
+        this._highlightTimers.push(t);
     }
 }

@@ -14,6 +14,7 @@ MAX_PERSONALITY_LENGTH = 1000
 MAX_NAME_LENGTH = 50
 MAX_AVATAR_LENGTH = 10
 MAX_DEBATERS = 20
+MAX_ROUNDS = 50
 
 
 class Debater(BaseModel):
@@ -35,7 +36,7 @@ class Debater(BaseModel):
 class DebateConfig(BaseModel):
     topic: str = Field(max_length=MAX_TOPIC_LENGTH)
     debater_names: list[str] = Field(max_length=MAX_DEBATERS)
-    max_rounds: int | None = None
+    max_rounds: int | None = Field(default=None, ge=1, le=MAX_ROUNDS)
 
 
 class UserMessage(BaseModel):
