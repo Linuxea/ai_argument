@@ -1,44 +1,70 @@
 /* ═══════════════════════════════════════════════════════
-   Design Tokens — colors, spacing, typography, motion
+   Design Tokens — 中式水墨辩论场 (Ink-wash Debate Salon)
+   Xuan-paper ground · ink-tone accents · vermillion seals
    ═══════════════════════════════════════════════════════ */
 
 @layer tokens {
     :root {
-        /* Surfaces — warm parchment */
-        --bg-base:       #f5f1ea;
-        --bg-surface:    #faf8f4;
-        --bg-elevated:   #ffffff;
-        --bg-card:       #ffffff;
-        --bg-input:      #f0ece4;
-        --bg-overlay:    rgba(26, 23, 20, 0.45);
+        /* Surfaces — 生宣 xuan paper, warm ivory */
+        --bg-base:       #f2ecdf;
+        --bg-surface:    #faf5ea;
+        --bg-elevated:   #fffdf6;
+        --bg-card:       #fffdf6;
+        --bg-input:      #ece4d2;
+        --bg-overlay:    rgba(28, 24, 18, 0.5);
 
-        /* Borders & shadows */
-        --border:        #d4c8b1;
-        --border-hover:  #c0a0a8;
-        --border-strong: #a89270;
-        --shadow-sm:     0 1px 2px rgba(166, 115, 50, 0.05);
-        --shadow-md:     0 2px 8px rgba(166, 115, 50, 0.07);
-        --shadow-lg:     0 4px 16px rgba(166, 115, 50, 0.09);
-        --shadow-xl:     0 10px 32px rgba(166, 115, 50, 0.14);
+        /* Borders & shadows — ink-toned, not cool grey */
+        --border:        #d9ccb2;
+        --border-hover:  #b8a17e;
+        --border-strong: #9a8a6c;
+        --shadow-sm:     0 1px 2px rgba(43, 38, 32, 0.06);
+        --shadow-md:     0 2px 8px rgba(43, 38, 32, 0.08);
+        --shadow-lg:     0 4px 16px rgba(43, 38, 32, 0.10);
+        --shadow-xl:     0 10px 32px rgba(43, 38, 32, 0.16);
 
-        /* Text */
-        --ink:           #1a1714;
-        --ink-soft:      #4a4338;
-        --ink-muted:     #7a6f5d;
+        /* Text — ink in five tones (焦/浓/重/淡/清) */
+        --ink:           #1d1a16;
+        --ink-soft:      #3f3830;
+        --ink-muted:     #8a7d68;
 
-        /* Brand accents */
-        --gold:          #a67b32;
-        --gold-dim:      #8b5a14;
-        --gold-glow:     rgba(166, 115, 50, 0.14);
-        --sage:          #5a6e50;
+        /* Primary accent — 焦墨 burnt ink (replaces gold).
+           Kept under the --gold* name so every existing
+           var(--gold) reference picks up the new ink tone
+           without touching component files. */
+        --gold:          #2b2620;
+        --gold-dim:      #13100c;
+        --gold-glow:     rgba(43, 38, 32, 0.12);
+
+        /* Text colour that sits on top of a --gold fill.
+           Light mode: white on burnt-ink buttons. */
+        --on-accent:     #ffffff;
+
+        /* 朱砂 cinnabar — reserved for seal/signature semantics
+           only (brand mark, avatar frames, mentions, blockquotes,
+           search highlights). Never the generic UI accent, so it
+           never collides with the 反方 debater's red. */
+        --cinnabar:        #b8413a;
+        --cinnabar-dim:    #9a3329;
+        --cinnabar-glow:   rgba(184, 65, 58, 0.12);
+
+        /* 松烟青 sage — judge / moderation (semantic unchanged) */
+        --sage:          #55704c;
         --sage-dim:      #3d4d40;
-        --sage-glow:     rgba(90, 110, 80, 0.10);
+        --sage-glow:     rgba(85, 112, 76, 0.10);
+
+        /* 花青 navy — user side / download (semantic unchanged) */
         --navy:          #3e5260;
         --navy-glow:     rgba(62, 82, 96, 0.10);
+
+        /* 胭脂 rose — danger / disconnect (semantic unchanged) */
         --rose:          #b85450;
 
-        /* Typography */
-        --font-display:  'Merriweather', Georgia, 'Songti SC', 'STSong', serif;
+        /* Typography — display uses a Latin book serif (Georgia,
+           universally available) first so "The Salon" renders
+           elegantly, then falls through to system Sông fonts for
+           CJK glyphs. No external CJK webfont (Noto Serif SC is
+           ~5MB; system stack keeps the app light & offline-friendly). */
+        --font-display:  Georgia, 'Noto Serif SC', 'Noto Serif CJK SC', 'Songti SC', 'STSong', 'SimSun', serif;
         --font-body:     'Source Sans Pro', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
         --font-mono:     'Source Code Pro', 'JetBrains Mono', ui-monospace, monospace;
 
@@ -64,12 +90,12 @@
         --space-7:       3rem;
         --space-8:       4rem;
 
-        /* Radii */
-        --radius-xs:     4px;
-        --radius-sm:     8px;
-        --radius-md:     12px;
-        --radius-lg:     16px;
-        --radius-xl:     24px;
+        /* Radii — slightly tighter for a 扁平/卷轴 feel */
+        --radius-xs:     3px;
+        --radius-sm:     6px;
+        --radius-md:     10px;
+        --radius-lg:     14px;
+        --radius-xl:     22px;
         --radius-full:   9999px;
 
         /* Motion */
@@ -94,34 +120,46 @@
         --z-dialog:         90;
     }
 
+    /* 松烟 night mode — warm soot black, not cool blue-grey.
+       The --gold accent inverts to moon-white paper so it stays
+       visible on the dark ground; --on-accent flips to ink text
+       so button labels remain legible on the light accent fill. */
     html.dark {
-        --bg-base:       #0f1014;
-        --bg-surface:    #181820;
-        --bg-elevated:   #22232e;
-        --bg-card:       #282935;
-        --bg-input:      #1d1e28;
+        --bg-base:       #15110c;
+        --bg-surface:    #1d1813;
+        --bg-elevated:   #26201a;
+        --bg-card:       #2a231d;
+        --bg-input:      #1f1a14;
         --bg-overlay:    rgba(0, 0, 0, 0.55);
 
-        --border:        #2e2f3d;
-        --border-hover:  #44455a;
-        --border-strong: #5a5b72;
+        --border:        #34291f;
+        --border-hover:  #4d3e2e;
+        --border-strong: #6a5743;
         --shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.30);
         --shadow-md:     0 2px 12px rgba(0, 0, 0, 0.40);
         --shadow-lg:     0 6px 22px rgba(0, 0, 0, 0.48);
         --shadow-xl:     0 14px 40px rgba(0, 0, 0, 0.55);
 
-        --ink:           #ebe6dc;
-        --ink-soft:      #c4bdae;
-        --ink-muted:     #8e8675;
+        --ink:           #ece4d4;
+        --ink-soft:      #c8bca4;
+        --ink-muted:     #968871;
 
-        --gold:          #d4a040;
-        --gold-dim:      #b88528;
-        --gold-glow:     rgba(212, 160, 64, 0.18);
-        --sage:          #7eb070;
+        --gold:          #d8cdb6;
+        --gold-dim:      #c2b69e;
+        --gold-glow:     rgba(216, 205, 182, 0.16);
+        --on-accent:     #1d1a16;
+
+        --cinnabar:      #d65b54;
+        --cinnabar-dim:  #b8413a;
+        --cinnabar-glow: rgba(214, 91, 84, 0.16);
+
+        --sage:          #82b074;
         --sage-dim:      #5a8050;
-        --sage-glow:     rgba(126, 176, 112, 0.14);
-        --navy:          #7da0b2;
-        --navy-glow:     rgba(125, 160, 178, 0.14);
+        --sage-glow:     rgba(130, 176, 116, 0.14);
+
+        --navy:          #82a6b8;
+        --navy-glow:     rgba(130, 166, 184, 0.14);
+
         --rose:          #d77571;
     }
 

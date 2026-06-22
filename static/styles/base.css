@@ -40,14 +40,14 @@
     }
 
     a {
-        color: var(--gold-dim);
+        color: var(--cinnabar-dim);
         text-decoration: none;
-        border-bottom: 1px dashed var(--gold-dim);
+        border-bottom: 1px dashed var(--cinnabar-dim);
         transition: color var(--duration-fast) var(--ease-out);
     }
 
     a:hover {
-        color: var(--gold);
+        color: var(--cinnabar);
         border-bottom-style: solid;
     }
 

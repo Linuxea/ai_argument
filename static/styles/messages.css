@@ -50,8 +50,17 @@
     }
 
     .message-avatar {
-        font-size: 1.05rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.85em;
+        height: 1.85em;
+        font-size: 0.95rem;
         line-height: 1;
+        border: 1.5px solid var(--cinnabar);
+        background: var(--cinnabar-glow);
+        border-radius: 4px;
+        flex-shrink: 0;
     }
 
     .message-sender {
@@ -122,8 +131,8 @@
     .message-content blockquote {
         margin: 0.6em 0;
         padding: 0.4em 0.9em;
-        border-left: 2px solid var(--gold);
-        background: var(--gold-glow);
+        border-left: 2px solid var(--cinnabar);
+        background: var(--cinnabar-glow);
         color: var(--ink-soft);
         font-style: italic;
         border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
@@ -171,11 +180,11 @@
         margin: 0 8px;
     }
 
-    /* Concession — tactical retreat */
+    /* Concession — tactical retreat, fading ink */
     .concession {
         display: inline;
-        background: var(--gold-glow);
-        border-left: 2px dashed var(--gold-dim);
+        background: rgba(43, 38, 32, 0.05);
+        border-left: 2px dashed var(--ink-muted);
         padding: 1px 6px 1px 8px;
         border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
         font-style: italic;
@@ -200,12 +209,12 @@
         border-left-color: var(--sage);
     }
 
-    /* @[[Name]] mention badge */
+    /* @[[Name]] mention badge — 朱砂印泥 vermillion seal */
     .mention {
         display: inline-block;
-        background: var(--gold-glow);
-        color: var(--gold-dim);
-        border: 1px solid color-mix(in srgb, var(--gold) 25%, transparent);
+        background: var(--cinnabar-glow);
+        color: var(--cinnabar-dim);
+        border: 1px solid color-mix(in srgb, var(--cinnabar) 25%, transparent);
         border-radius: var(--radius-xs);
         padding: 1px 7px;
         font-weight: 600;
@@ -219,7 +228,7 @@
         display: inline-block;
         width: 0.5em;
         height: 1em;
-        background: var(--gold);
+        background: var(--cinnabar);
         vertical-align: text-bottom;
         margin-left: 2px;
         animation: blink 1s steps(2) infinite;
@@ -240,7 +249,7 @@
         padding: 14px 18px;
         background: var(--bg-elevated);
         border-radius: var(--radius-md);
-        border-left: 3px solid var(--gold);
+        border-left: 3px solid var(--cinnabar);
         box-shadow: var(--shadow-sm);
         color: var(--ink-muted);
         font-style: italic;
@@ -255,7 +264,7 @@
     .skeleton-dots span {
         width: 6px;
         height: 6px;
-        background: var(--gold);
+        background: var(--cinnabar);
         border-radius: 50%;
         animation: dotPulse 1.4s infinite ease-in-out both;
     }
@@ -276,10 +285,10 @@
 
     @keyframes highlightPulse {
         0% {
-            box-shadow: var(--shadow-md), 0 0 0 0 var(--gold-glow);
+            box-shadow: var(--shadow-md), 0 0 0 0 var(--cinnabar-glow);
         }
         25% {
-            box-shadow: var(--shadow-lg), 0 0 0 6px var(--gold-glow);
+            box-shadow: var(--shadow-lg), 0 0 0 6px var(--cinnabar-glow);
         }
         100% {
             box-shadow: var(--shadow-md), 0 0 0 0 transparent;

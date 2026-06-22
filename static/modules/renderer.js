@@ -46,11 +46,15 @@ export class MessageRenderer {
         wrap.className = 'empty-state';
 
         wrap.innerHTML = `
-            <svg class="empty-state-illustration" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M22 40 Q22 28 34 28 H66 Q78 28 78 40 V64 Q78 76 66 76 H46 L34 86 V76 Q22 76 22 64 Z"/>
-                <path d="M42 50 H58 M42 58 H54"/>
-                <circle cx="92" cy="56" r="14" stroke-dasharray="3 4"/>
-                <path d="M92 50 V58 M88 56 H96"/>
+            <svg class="empty-state-illustration" viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M60 12 V22" stroke-width="1.5"/>
+                <rect x="22" y="22" width="76" height="7" rx="3.5" fill="currentColor" stroke="none" opacity="0.9"/>
+                <path d="M34 29 H86 V92 H34 Z" stroke-width="2.5"/>
+                <rect x="22" y="92" width="76" height="7" rx="3.5" fill="currentColor" stroke="none" opacity="0.9"/>
+                <path d="M50 42 H70" stroke-width="3"/>
+                <path d="M60 38 V66" stroke-width="3"/>
+                <path d="M50 54 H70" stroke-width="2.5"/>
+                <path d="M50 74 Q60 70 70 74" stroke-width="2.5"/>
             </svg>
             <h3>开启一场辩论</h3>
             <p>输入辩题、勾选两位以上的辩手，然后点击「开始辩论」。<br>需要灵感？试试下面的话题：</p>

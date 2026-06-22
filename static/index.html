@@ -9,8 +9,8 @@
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Source+Sans+Pro:wght@300;400;600;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles/main.css?v=21">
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles/main.css?v=22">
     <!-- Pin CDN deps to specific versions to avoid silent breaking changes.
          TODO: regenerate SRI hashes with `openssl dgst -sha384 -binary <file> | openssl base64 -A`
          and add integrity="..." attributes once we're on a network with registry access. -->
@@ -59,7 +59,7 @@
                 <h3>自定义辩手</h3>
                 <input type="text" id="custom-name" placeholder="名称" autocomplete="off">
                 <div class="inline-inputs">
-                    <input type="color" id="custom-color" value="#a67b32" aria-label="选择颜色">
+                    <input type="color" id="custom-color" value="#2b2620" aria-label="选择颜色">
                     <input type="text" id="custom-avatar" placeholder="表情符号" maxlength="2" autocomplete="off">
                 </div>
                 <select id="custom-stance" aria-label="立场">
@@ -130,6 +130,6 @@
         <div id="search-results" class="search-results"></div>
     </dialog>
 
-    <script type="module" src="/static/app.js?v=21"></script>
+    <script type="module" src="/static/app.js?v=22"></script>
 </body>
 </html>
