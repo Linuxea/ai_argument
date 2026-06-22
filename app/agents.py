@@ -286,12 +286,21 @@ def create_judge_agent(model_name: str, base_url: str | None = None, api_key: st
 
 
 def create_extractor_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[None, str]:
-    """Create a lightweight agent for extracting key argument points."""
+    """Create a lightweight agent for extracting key argument points.
+
+    Thinking is explicitly disabled: extraction is a simple classification
+    task, and leaving DeepSeek V4's default thinking mode on wastes ~62%
+    latency and ~86% output tokens per call. The unified ``thinking`` field
+    in ModelSettings is silently dropped by PydanticAI 1.x's capability layer
+    on the OpenAIModel path, so we use ``extra_body`` which is reliably
+    forwarded to the upstream API.
+    """
     agent: Agent[None, str] = Agent(
         _make_model(model_name, base_url, api_key),
         deps_type=None,
         output_type=str,
         instructions=EXTRACT_POINTS_PROMPT,
         tools=[],
+        model_settings={'extra_body': {'thinking': {'type': 'disabled'}}},
     )
     return agent

@@ -272,6 +272,28 @@ def test_b3_topic_refine_handles_no_choices(monkeypatch):
     assert resp.status_code == 502
 
 
+def test_b33_topic_refine_length_truncation_message(monkeypatch):
+    """Empty content with finish_reason='length' must surface the truncation
+    cause distinctly — this is the symptom users hit when DeepSeek V4's
+    default thinking mode burns the entire max_tokens budget on reasoning."""
+    _patch_topic_settings(monkeypatch)
+    response = MagicMock()
+    response.choices = [MagicMock()]
+    response.choices[0].message.content = ""
+    response.choices[0].finish_reason = "length"
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(return_value=response)
+
+    test_client = TestClient(app)
+    with patch("app.routes.topic.AsyncOpenAI", return_value=client):
+        resp = test_client.post("/api/topic/refine", json={"topic": "话题"})
+
+    assert resp.status_code == 502
+    detail = resp.json()["detail"]
+    assert "token 上限截断" in detail
+    assert "模型未返回话题文本" not in detail
+
+
 # ---------------------------------------------------------------------------
 # B16: _parse_extractor_output tolerates code fences / prose
 # ---------------------------------------------------------------------------

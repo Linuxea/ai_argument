@@ -145,12 +145,26 @@ def test_judge_agent_has_no_web_search_tool():
 
 
 def test_debater_agent_has_thinking_enabled():
+    """Debater agent configures ``thinking: True`` in model_settings.
+
+    NOTE: This only verifies the Python dict on the Agent instance. PydanticAI
+    1.x's capability layer does NOT forward the unified ``thinking`` field to
+    the OpenAI SDK on the OpenAIModel path (verified by intercepting
+    ``AsyncCompletions.create``: HTTP body has no ``reasoning_effort`` and no
+    ``extra_body.thinking``). In production, debater thinking is effectively ON
+    only because DeepSeek V4 ships with ``thinking.type=enabled`` as the
+    provider default. If that default ever changes, debater will silently lose
+    reasoning — to control it reliably, switch to
+    ``model_settings={'extra_body': {'thinking': {'type': 'enabled'}}, ...}``
+    like the extractor agent does (in reverse).
+    """
     with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key")
     assert agent.model_settings.get("thinking") is True
 
 
 def test_debater_agent_no_search_has_thinking_enabled():
+    """Same caveat as test_debater_agent_has_thinking_enabled applies."""
     with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key", enable_search=False)
     assert agent.model_settings.get("thinking") is True
@@ -164,6 +178,16 @@ def test_debater_agent_without_search_has_no_web_search_tool():
 
 
 def test_judge_agent_does_not_have_thinking_enabled():
+    """Judge agent does not set the unified ``thinking`` field.
+
+    NOTE: This only inspects the Python dict, not the actual HTTP request.
+    Because PydanticAI 1.x does not forward the unified ``thinking`` field on
+    the OpenAIModel path AND the judge agent doesn't set ``extra_body`` either,
+    the judge's effective thinking behavior is determined entirely by the
+    DeepSeek V4 provider default — which is currently ``enabled``. So despite
+    the test name, the judge DOES run thinking in production. Switch the
+    assertion or the agent config if you want to make this deterministic.
+    """
     with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_judge_agent("deepseek-chat", "https://api.example.com", "test-key")
     settings = agent.model_settings or {}
@@ -248,8 +272,17 @@ def test_extractor_agent_has_no_tools():
     assert len(tool_names) == 0
 
 
-def test_extractor_agent_has_no_thinking():
+def test_extractor_agent_disables_thinking_via_extra_body():
+    """Extractor explicitly disables thinking through ``extra_body``.
+
+    Unlike the unified ``thinking`` field (silently dropped by PydanticAI 1.x
+    on the OpenAIModel path), ``extra_body`` IS forwarded to the upstream API,
+    so this is the configuration that actually controls HTTP behavior.
+    Verified end-to-end: with this setting, extractor latency drops ~62%
+    and output tokens ~86% versus the DeepSeek V4 thinking-enabled default.
+    """
     with patch("app.agents._make_model", return_value=_mock_model()):
         agent = create_extractor_agent("deepseek-chat", "https://api.example.com", "test-key")
     settings = agent.model_settings or {}
     assert settings.get("thinking") is not True
+    assert settings["extra_body"]["thinking"]["type"] == "disabled"

@@ -38,16 +38,20 @@ async def refine_topic(request: RefineTopicRequest):
         response = await client.chat.completions.create(
             model=settings.model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
+            max_tokens=512,
             temperature=0.7,
+            extra_body={"thinking": {"type": "disabled"}},
         )
         choice = response.choices[0] if response.choices else None
         content = (choice.message.content if choice and choice.message else None) or ""
         refined_topic = content.strip()
         if not refined_topic:
-            # Model returned empty content (content filter, tool-only response,
-            # or reasoning model that didn't emit text). Don't crash with a
-            # misleading 502 — tell the user plainly.
+            finish_reason = getattr(choice, "finish_reason", None) if choice else None
+            if finish_reason == "length":
+                raise HTTPException(
+                    status_code=502,
+                    detail="模型输出被 token 上限截断，请调大 max_tokens 或确认已关闭 thinking 模式",
+                )
             raise HTTPException(
                 status_code=502,
                 detail="模型未返回话题文本，请稍后重试或换个表述",
