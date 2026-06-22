@@ -582,11 +582,17 @@ class DebateApp {
 
         const dark = isDark();
         const palette = dark ? {
-            bg: '#0f1014', fg: '#ebe6dc', card: '#22232e', input: '#1d1e28',
-            muted: '#8e8675', border: '#2e2f3d', user: 'linear-gradient(135deg,rgba(125,160,178,.14),#22232e)',
+            bg: '#15110c', fg: '#ece4d4', card: '#26201a', input: '#1f1a14',
+            muted: '#968871', border: '#34291f', navy: '#82a6b8',
+            user: 'linear-gradient(135deg,rgba(130,166,184,.14),#26201a)',
+            accent: '#d8cdb6', cinnabar: '#d65b54', cinnabarDim: '#b8413a',
+            cinnabarGlow: 'rgba(214,91,84,.16)',
         } : {
-            bg: '#f5f1ea', fg: '#1a1714', card: '#ffffff', input: '#f0ece4',
-            muted: '#7a6f5d', border: '#d4c8b1', user: 'linear-gradient(135deg,rgba(62,82,96,.10),#ffffff)',
+            bg: '#f2ecdf', fg: '#1d1a16', card: '#fffdf6', input: '#ece4d2',
+            muted: '#8a7d68', border: '#d9ccb2', navy: '#3e5260',
+            user: 'linear-gradient(135deg,rgba(62,82,96,.10),#fffdf6)',
+            accent: '#2b2620', cinnabar: '#b8413a', cinnabarDim: '#9a3329',
+            cinnabarGlow: 'rgba(184,65,58,.12)',
         };
 
         let body = '';
@@ -625,22 +631,22 @@ class DebateApp {
         const html = `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><title>${escapeHtml(topic)}</title>
 <style>
-  body{font-family:Georgia,serif;max-width:780px;margin:40px auto;padding:0 20px;background:${palette.bg};color:${palette.fg};line-height:1.75}
-  h1{font-size:1.5rem;text-align:center;padding-bottom:16px;border-bottom:2px solid #a67b32;margin-bottom:32px}
+  body{font-family:Georgia,'Songti SC','STSong','SimSun',serif;max-width:780px;margin:40px auto;padding:0 20px;background:${palette.bg};color:${palette.fg};line-height:1.75}
+  h1{font-size:1.5rem;text-align:center;padding-bottom:16px;border-bottom:2px solid ${palette.cinnabar};margin-bottom:32px}
   .debater-msg,.user-msg,.tool-msg{margin-bottom:24px}
   .msg-header{font-size:.82rem;margin-bottom:6px}
   .msg-header .avatar{font-size:1rem}
   .msg-header .sender{font-weight:700;font-size:.85rem;letter-spacing:.04em}
   .msg-header .time{color:${palette.muted};font-size:.72rem;margin-left:8px}
-  .msg-body{background:${palette.card};padding:14px 18px;border-radius:12px;border-left:3px solid #a67b32;font-size:.95rem}
-  .user-msg .msg-body{border-left-color:#3e5260;background:${palette.user}}
+  .msg-body{background:${palette.card};padding:14px 18px;border-radius:10px;border-left:3px solid ${palette.accent};font-size:.95rem}
+  .user-msg .msg-body{border-left-color:${palette.navy};background:${palette.user}}
   .sys-msg{text-align:center;color:${palette.muted};font-style:italic;font-size:.84rem;margin:14px 0}
   .sys-msg::before,.sys-msg::after{content:' — ';color:${palette.border}}
   .tool-msg .msg-body{border-left:1px dashed ${palette.border};background:${palette.input};font-size:.85rem;color:${palette.muted};padding:10px 14px}
-  .mention{background:rgba(166,123,50,.14);color:#8b5a14;border-radius:4px;padding:1px 6px;font-weight:600}
-  blockquote{margin:0.6em 0;padding:0.4em 0.9em;border-left:2px solid #a67b32;background:rgba(166,123,50,.10);color:${palette.muted};font-style:italic;border-radius:0 4px 4px 0}
-  code{background:${palette.input};padding:1px 5px;border-radius:4px}
-  pre{background:${palette.input};border:1px solid ${palette.border};border-radius:8px;padding:12px;overflow-x:auto}
+  .mention{background:${palette.cinnabarGlow};color:${palette.cinnabarDim};border-radius:3px;padding:1px 6px;font-weight:600}
+  blockquote{margin:0.6em 0;padding:0.4em 0.9em;border-left:2px solid ${palette.cinnabar};background:${palette.cinnabarGlow};color:${palette.muted};font-style:italic;border-radius:0 3px 3px 0}
+  code{background:${palette.input};padding:1px 5px;border-radius:3px}
+  pre{background:${palette.input};border:1px solid ${palette.border};border-radius:6px;padding:12px;overflow-x:auto}
 </style></head><body>
 <h1>${escapeHtml(topic)}</h1>
 ${body}

@@ -23,11 +23,11 @@ test('sanitizeColor accepts 6-digit hex', () => {
 });
 
 test('sanitizeColor rejects malformed and falls back', () => {
-    assert.equal(utils.sanitizeColor('red'), '#a67b32');
-    assert.equal(utils.sanitizeColor('#xyz'), '#a67b32');
-    assert.equal(utils.sanitizeColor('#abc'), '#a67b32');  // 3-digit not allowed
-    assert.equal(utils.sanitizeColor(''), '#a67b32');
-    assert.equal(utils.sanitizeColor(null), '#a67b32');
+    assert.equal(utils.sanitizeColor('red'), '#2b2620');
+    assert.equal(utils.sanitizeColor('#xyz'), '#2b2620');
+    assert.equal(utils.sanitizeColor('#abc'), '#2b2620');  // 3-digit not allowed
+    assert.equal(utils.sanitizeColor(''), '#2b2620');
+    assert.equal(utils.sanitizeColor(null), '#2b2620');
 });
 
 test('escapeRegex escapes regex metacharacters', () => {

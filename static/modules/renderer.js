@@ -448,7 +448,7 @@ export class MessageRenderer {
             // Reset speaker tracking so judge gets its own header even if last debater was named "裁判"
             this._lastSpeakerName = null;
             this._lastSpeakerType = null;
-            this.startDebaterTurn({ name: '裁判', color: '#5a6e50', avatar: '⚖️' });
+            this.startDebaterTurn({ name: '裁判', color: '#55704c', avatar: '⚖️' });
             this.currentMessageContainer.classList.add('judge');
             this.currentMessageContainer.dataset.judge = 'true';
             this._lastSpeakerType = 'judge';

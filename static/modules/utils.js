@@ -6,7 +6,7 @@ export function escapeHtml(text) {
 }
 
 export function sanitizeColor(color) {
-    return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#a67b32';
+    return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#2b2620';
 }
 
 export function escapeRegex(string) {
