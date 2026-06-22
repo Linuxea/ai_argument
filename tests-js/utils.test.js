@@ -62,12 +62,6 @@ test('formatTime returns HH:MM:SS-ish string', () => {
     assert.match(out, /\d{1,2}:\d{2}/);
 });
 
-test('uid produces a non-empty string with a dash', () => {
-    const id = utils.uid();
-    assert.match(id, /-/);
-    assert.ok(id.length > 4);
-});
-
 test('icon() returns a span placeholder with data-lucide', () => {
     const el = utils.icon('moon', { title: 'tip', 'aria-label': 'a' });
     assert.equal(el.tagName, 'SPAN');

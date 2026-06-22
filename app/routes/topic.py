@@ -1,10 +1,11 @@
 """Topic refinement route: AI-powered topic clarification.
 
- M2 (refactor): migrated from a one-shot raw ``AsyncOpenAI`` call to a
- PydanticAI ``Agent`` so the LLM layer is uniform. Reuses the engine's
- model config (base_url, api_key, model name) via ``app.config.settings``
- — no separate client is constructed per request.
+M2 (refactor): migrated from a one-shot raw ``AsyncOpenAI`` call to a
+PydanticAI ``Agent`` so the LLM layer is uniform. Reuses the engine's
+model config (base_url, api_key, model name) via ``app.config.settings``
+— no separate client is constructed per request.
 """
+
 from __future__ import annotations
 
 import logging

@@ -1,20 +1,20 @@
 """Extra tests to maximise coverage of small / hard-to-reach branches."""
+
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from pydantic_ai import AgentRunResultEvent, FunctionToolCallEvent, FunctionToolResultEvent
 from pydantic_ai.messages import (
+    PartDeltaEvent,
     PartStartEvent,
     TextPart,
     ThinkingPart,
-    ThinkingPartDelta,
-    PartDeltaEvent,
     ToolCallPart,
 )
 
@@ -80,15 +80,9 @@ def test_chrome_devtools_easter_egg_endpoint():
 def test_lifespan_initialises_state(monkeypatch):
     """Going through the lifespan context populates app.state.engine et al."""
     # Stub out the agent factories so we don't try to instantiate real models.
-    monkeypatch.setattr(
-        "app.engine.debate.create_debater_agent", lambda *a, **k: MagicMock()
-    )
-    monkeypatch.setattr(
-        "app.engine.debate.create_judge_agent", lambda *a, **k: MagicMock()
-    )
-    monkeypatch.setattr(
-        "app.engine.debate.create_extractor_agent", lambda *a, **k: MagicMock()
-    )
+    monkeypatch.setattr("app.engine.debate.create_debater_agent", lambda *a, **k: MagicMock())
+    monkeypatch.setattr("app.engine.debate.create_judge_agent", lambda *a, **k: MagicMock())
+    monkeypatch.setattr("app.engine.debate.create_extractor_agent", lambda *a, **k: MagicMock())
 
     fresh_app = create_app()
     with TestClient(fresh_app) as client:
@@ -115,8 +109,9 @@ def test_make_model_constructs_openai_chat_model():
     removed thereafter; ``OpenAIChatModel`` is the correct class for any
     OpenAI-compatible Chat Completions endpoint (DeepSeek, Ollama, vLLM, etc.).
     """
-    from app.agents import _make_model
     from pydantic_ai.models.openai import OpenAIChatModel
+
+    from app.agents import _make_model
 
     model = _make_model("gpt-test", base_url="https://api.example.com", api_key="k")
     assert isinstance(model, OpenAIChatModel)
@@ -223,9 +218,7 @@ def test_debate_engine_init_wires_agents(monkeypatch):
 
     monkeypatch.setattr("app.engine.debate.create_debater_agent", fake_debater)
     monkeypatch.setattr("app.engine.debate.create_judge_agent", lambda *a, **k: judge)
-    monkeypatch.setattr(
-        "app.engine.debate.create_extractor_agent", lambda *a, **k: extractor
-    )
+    monkeypatch.setattr("app.engine.debate.create_extractor_agent", lambda *a, **k: extractor)
 
     eng = DebateEngine(
         model="m",
@@ -249,15 +242,9 @@ def test_debate_engine_init_wires_agents(monkeypatch):
 @pytest.mark.asyncio
 async def test_start_cancels_existing_loop_task(monkeypatch):
     """A new start() should cancel any running loop task to avoid ghost tasks."""
-    monkeypatch.setattr(
-        "app.engine.debate.create_debater_agent", lambda *a, **k: MagicMock()
-    )
-    monkeypatch.setattr(
-        "app.engine.debate.create_judge_agent", lambda *a, **k: MagicMock()
-    )
-    monkeypatch.setattr(
-        "app.engine.debate.create_extractor_agent", lambda *a, **k: MagicMock()
-    )
+    monkeypatch.setattr("app.engine.debate.create_debater_agent", lambda *a, **k: MagicMock())
+    monkeypatch.setattr("app.engine.debate.create_judge_agent", lambda *a, **k: MagicMock())
+    monkeypatch.setattr("app.engine.debate.create_extractor_agent", lambda *a, **k: MagicMock())
 
     eng = DebateEngine(model="m")
 
@@ -276,9 +263,7 @@ async def test_start_cancels_existing_loop_task(monkeypatch):
 async def test_ensure_loop_running_creates_task():
     """When state is active and no task exists, ensure_loop_running schedules one."""
     eng = _bare_engine()
-    eng.state = DebateState(
-        topic="t", debaters=[Debater(name="x", personality="p")], active=True
-    )
+    eng.state = DebateState(topic="t", debaters=[Debater(name="x", personality="p")], active=True)
 
     async def fake_run_loop():
         pass
@@ -294,9 +279,7 @@ async def test_ensure_loop_running_creates_task():
 
 def test_ensure_loop_running_noop_when_inactive():
     eng = _bare_engine()
-    eng.state = DebateState(
-        topic="t", debaters=[Debater(name="x", personality="p")], active=False
-    )
+    eng.state = DebateState(topic="t", debaters=[Debater(name="x", personality="p")], active=False)
     eng.ensure_loop_running()
     assert eng._loop_task is None
 

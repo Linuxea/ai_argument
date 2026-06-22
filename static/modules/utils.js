@@ -35,10 +35,6 @@ export function formatTime(date = new Date()) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
-export function uid() {
-    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
 // Render a lucide icon by name. Returns an element placeholder that lucide
 // upgrades to an <svg>. If lucide never loads, we leave a tiny fallback glyph.
 const ICON_FALLBACK = {
@@ -61,18 +57,23 @@ export function icon(name, attrs = {}) {
     return wrapper;
 }
 
-// Convert all data-lucide placeholders into svg icons.
-// Called after dynamic DOM insertions.
+// Convert all data-lucide placeholders into svg icons. Called after dynamic
+// DOM insertions. Pass a ``root`` element to scope the fallback-text scan —
+// this avoids re-scanning the whole document (O(N) bubbles) every time a
+// streaming chunk or toast is added. The lucide.createIcons() call itself
+// still walks the whole document (library API limit), so the win is on the
+// fallback loop that runs every tick during streaming.
 let _rafScheduled = false;
-export function refreshIcons() {
+export function refreshIcons(root) {
     if (_rafScheduled) return;
     _rafScheduled = true;
     requestAnimationFrame(() => {
         _rafScheduled = false;
 
+        const scope = root || document;
         // Apply text fallback to any data-lucide placeholders that haven't been
         // upgraded yet (will be visible until lucide loads, or permanently if CDN fails).
-        document.querySelectorAll('[data-lucide]:not(svg)').forEach((el) => {
+        scope.querySelectorAll('[data-lucide]:not(svg)').forEach((el) => {
             if (!el.textContent && !el.dataset.fallbackApplied) {
                 const name = el.dataset.lucide;
                 el.textContent = ICON_FALLBACK[name] || '';

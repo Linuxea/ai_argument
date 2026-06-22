@@ -194,10 +194,10 @@
         opacity: 0.7;
     }
 
-    /* Judge — sage accent */
-    .message.judge .message-content,
-    [data-judge="true"] {
-        border-left-color: var(--sage) !important;
+    /* Judge — sage accent. Specificity (0,3,0) already beats the default
+       .message-content border-left-color at (0,1,0), so no !important. */
+    .message.judge .message-content {
+        border-left-color: var(--sage);
     }
 
     /* @[[Name]] mention badge */

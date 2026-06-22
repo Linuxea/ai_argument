@@ -1,11 +1,11 @@
 """PydanticAI agent definitions and prompt templates for debaters/judge."""
+
 from __future__ import annotations
 
 from pydantic_ai import Agent, RunContext
 
 from app.engine.state import DebaterDeps
-from app.models import Debater, Stance
-
+from app.models import Stance
 
 DEBATE_RULES = """\
 You are a participant in a multi-party debate. Follow these rules:
@@ -202,6 +202,7 @@ def create_debater_agent(
     tools = []
     if enable_search:
         from app.tools import web_search
+
         tools.append(web_search)
 
     agent: Agent[DebaterDeps, str] = Agent(
@@ -210,7 +211,7 @@ def create_debater_agent(
         output_type=str,
         instructions=_build_debater_instructions,
         tools=tools,
-        model_settings={'extra_body': {'thinking': {'type': 'enabled'}}},
+        model_settings={"extra_body": {"thinking": {"type": "enabled"}}},
     )
     return agent
 
@@ -243,10 +244,12 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
         parts.append(STRATEGY_INSTRUCTIONS)
         parts.append(MEMORY_INSTRUCTIONS)
 
-    parts.extend([
-        f"Your stance: {stance}",
-        debater.personality,
-    ])
+    parts.extend(
+        [
+            f"Your stance: {stance}",
+            debater.personality,
+        ]
+    )
 
     if debater.enable_search:
         parts.append(SEARCH_INSTRUCTIONS)
@@ -271,7 +274,9 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-def create_judge_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[None, str]:
+def create_judge_agent(
+    model_name: str, base_url: str | None = None, api_key: str | None = None
+) -> Agent[None, str]:
     """Create a PydanticAI Agent configured for debate judging.
 
     Thinking is explicitly disabled via ``extra_body`` so judging latency is
@@ -281,12 +286,14 @@ def create_judge_agent(model_name: str, base_url: str | None = None, api_key: st
         _make_model(model_name, base_url, api_key),
         output_type=str,
         instructions=JUDGE_PROMPT,
-        model_settings={'extra_body': {'thinking': {'type': 'disabled'}}},
+        model_settings={"extra_body": {"thinking": {"type": "disabled"}}},
     )
     return agent
 
 
-def create_extractor_agent(model_name: str, base_url: str | None = None, api_key: str | None = None) -> Agent[None, str]:
+def create_extractor_agent(
+    model_name: str, base_url: str | None = None, api_key: str | None = None
+) -> Agent[None, str]:
     """Create a lightweight agent for extracting key argument points.
 
     Thinking is explicitly disabled via ``extra_body`` (same reason as judge):
@@ -299,7 +306,7 @@ def create_extractor_agent(model_name: str, base_url: str | None = None, api_key
         output_type=str,
         instructions=EXTRACT_POINTS_PROMPT,
         tools=[],
-        model_settings={'extra_body': {'thinking': {'type': 'disabled'}}},
+        model_settings={"extra_body": {"thinking": {"type": "disabled"}}},
     )
     return agent
 
@@ -337,9 +344,9 @@ def create_topic_refiner_agent(
         instructions=_TOPIC_REFINE_PROMPT,
         tools=[],
         model_settings={
-            'max_tokens': 512,
-            'temperature': 0.7,
-            'extra_body': {'thinking': {'type': 'disabled'}},
+            "max_tokens": 512,
+            "temperature": 0.7,
+            "extra_body": {"thinking": {"type": "disabled"}},
         },
     )
     return agent

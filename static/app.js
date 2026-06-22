@@ -23,6 +23,7 @@ class DebateApp {
         // Auto-judge timer reference so we can cancel it if the user navigates
         // away or starts a new debate before it fires.
         this._autoJudgeTimer = null;
+        this._autoJudgeToastEl = null;
         this.init();
     }
 
@@ -202,6 +203,30 @@ class DebateApp {
             clearTimeout(this._autoJudgeTimer);
             this._autoJudgeTimer = null;
         }
+        if (this._autoJudgeToastEl) {
+            toast.dismiss(this._autoJudgeToastEl);
+            this._autoJudgeToastEl = null;
+        }
+    }
+
+    /**
+     * Schedule an auto-judge with a visible, cancellable countdown.
+     *
+     * Audit C3: previously a 400ms invisible timer fired judge immediately
+     * after `debate_end`, giving the user no time to read the final round
+     * and no way to opt out. We now wait long enough to be interruptible
+     * and surface the pending action so a click on the judge button (or
+     * any new debate) cancels it cleanly.
+     */
+    _scheduleAutoJudge() {
+        this._cancelAutoJudge();
+        this._autoJudgeToastEl = toast.info('评委将在 5 秒后开始点评 — 点击「请裁判点评」立即开始', { duration: 0 });
+        this._autoJudgeTimer = setTimeout(() => {
+            this._autoJudgeTimer = null;
+            this._autoJudgeToastEl = null;
+            // Sanity check the state in case it changed during the delay.
+            if (this.state.is('stopped')) this._requestJudge();
+        }, 5000);
     }
 
     async _startDebate() {
@@ -281,6 +306,8 @@ class DebateApp {
     }
 
     async _requestJudge() {
+        // User-initiated judge cancels any pending auto-judge timer.
+        this._cancelAutoJudge();
         try {
             this.state.set('judging');
             await api.requestJudge();
@@ -406,15 +433,7 @@ class DebateApp {
                 this.renderer.addSystem(`辩论结束：${reasonMap[data.reason] || data.reason}`);
                 this._setRoundProgress(this.totalRounds, this.totalRounds, null);
                 if (data.reason === 'Max rounds reached') {
-                    // Auto-judge after a short delay. Track the timer so we
-                    // can cancel it if the user starts a new debate or
-                    // navigates away before it fires.
-                    this._cancelAutoJudge();
-                    this._autoJudgeTimer = setTimeout(() => {
-                        this._autoJudgeTimer = null;
-                        // Sanity check the state in case it changed during the delay.
-                        if (this.state.is('stopped')) this._requestJudge();
-                    }, 400);
+                    this._scheduleAutoJudge();
                 }
                 break;
             }
@@ -441,6 +460,14 @@ class DebateApp {
                 toast.error(data?.message || '评判失败');
                 this.renderer.addSystem(data?.message || '评判失败');
                 break;
+
+            default:
+                // Audit M4: a `default` case makes backend-frontend event
+                // schema drift visible. Unknown events are dropped silently
+                // by the SSEClient's KNOWN_EVENTS filter, but if a future
+                // revision loosens that filter we want to know about it.
+                console.warn('Unknown SSE event type:', type, data);
+                break;
         }
     }
 
@@ -449,7 +476,6 @@ class DebateApp {
         this.roundProgressFill.style.width = pct + '%';
         if (speakerName) {
             this.currentSpeakerEl.textContent = speakerName;
-            this.currentSpeakerEl.previousElementSibling?.classList.remove('hidden');
         } else if (current >= total && total > 0) {
             this.currentSpeakerEl.textContent = '已完成';
         } else {
@@ -459,6 +485,12 @@ class DebateApp {
         // completed-round count when between rounds.
         const displayRound = speakerName ? Math.max(1, current) : current;
         this.roundBadgeEl.textContent = `第 ${displayRound} / ${total} 轮`;
+        // Reflect progress for screen readers (role="progressbar" on #round-progress).
+        this.roundProgress.setAttribute('aria-valuenow', String(Math.round(pct)));
+        this.roundProgress.setAttribute(
+            'aria-label',
+            `第 ${displayRound} / ${total} 轮`,
+        );
     }
 
     // ─── UI state machine ──────────────────────────

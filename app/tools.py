@@ -1,4 +1,5 @@
 """Brave Search web_search tool with rate limiting."""
+
 import asyncio
 import time
 

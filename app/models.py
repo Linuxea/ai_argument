@@ -1,4 +1,5 @@
 """Pydantic models for API contracts plus the ArgumentSummary data class."""
+
 from __future__ import annotations
 
 import re

@@ -47,7 +47,7 @@ test('SSEClient parses JSON event payloads and dispatches "event" with type+data
     const seen = [];
     c.addEventListener('event', (e) => seen.push(e.detail));
     src.dispatch('debater_chunk', { data: JSON.stringify({ text_chunk: 'hi' }) });
-    assert.deepEqual(seen, [{ type: 'debater_chunk', data: { text_chunk: 'hi' } }]);
+    assert.deepEqual(seen, [{ type: 'debater_chunk', data: { text_chunk: 'hi' }, id: '' }]);
 });
 
 test('SSEClient silently drops events with malformed JSON', () => {

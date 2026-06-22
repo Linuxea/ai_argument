@@ -1,4 +1,5 @@
 """Input-validation contract tests (Field length caps)."""
+
 import pytest
 from pydantic import ValidationError
 

@@ -1,7 +1,18 @@
 // markdown.js — configure marked, render with mentions/concession decoration
+//
+// Safety contract:
+//   1. Raw HTML tokens are escaped (renderer.html override).
+//   2. After marked produces HTML, we run a DOM-based sanitiser that strips
+//      on* event-handler attributes and neutralises javascript:/vbscript:/
+//      data: URLs on href/src. This closes the gap that marked alone leaves
+//      on link/image URLs.
+//   3. Marked is pinned to a known version (index.html) — historical
+//      releases of marked have had breaking XSS regressions.
 import { escapeHtml } from './utils.js';
 
 let _configured = false;
+
+const DANGEROUS_URL_RE = /^\s*(javascript|vbscript|file|data):/i;
 
 function configureMarked() {
     if (_configured) return true;
@@ -27,12 +38,36 @@ function configureMarked() {
     return true;
 }
 
+function _sanitizeHtml(html) {
+    if (typeof window === 'undefined' || typeof window.DOMParser === 'undefined') {
+        return html;
+    }
+    const doc = new window.DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+    const root = doc.body.firstChild;
+    if (!root) return html;
+    const elems = root.querySelectorAll('*');
+    elems.forEach((el) => {
+        for (const attr of [...el.attributes]) {
+            const name = attr.name.toLowerCase();
+            const value = attr.value || '';
+            if (name.startsWith('on')) {
+                el.removeAttribute(attr.name);
+            } else if ((name === 'href' || name === 'src' || name === 'xlink:href') &&
+                       DANGEROUS_URL_RE.test(value)) {
+                el.setAttribute(attr.name, '#');
+            }
+        }
+    });
+    return root.innerHTML;
+}
+
 // Try configure immediately; will retry inside renderMarkdown if marked loads later.
 configureMarked();
 
 /**
  * Render markdown with custom mention/concession decoration.
- * Safe against raw HTML injection via the renderer.html override.
+ * Safe against raw HTML injection via the renderer.html override plus
+ * a DOM-based sanitiser pass that strips on* handlers and dangerous URLs.
  * Falls back to plain-text rendering if marked is unavailable.
  */
 export function renderMarkdown(raw) {
@@ -88,7 +123,7 @@ export function renderMarkdown(raw) {
             return `<div class="concession concession-block">${inner}</div>`;
         });
 
-        return html;
+        return _sanitizeHtml(html);
     } catch (err) {
         console.error('renderMarkdown failed:', err);
         return escapeHtml(raw);

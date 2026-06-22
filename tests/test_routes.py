@@ -1,4 +1,5 @@
 """Integration tests for FastAPI route handlers (debate / debaters / topic)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +12,6 @@ from app.deps import DebaterRepository, get_debater_repository, get_engine
 from app.engine.state import DebateState, Event
 from app.models import Debater
 from main import app
-
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -303,9 +303,7 @@ def test_stream_terminates_on_terminal_event(fake_engine, client):
     fake_engine.event_queue.put_nowait(
         Event(type="debater_chunk", payload={"debater_name": "x", "text_chunk": "hi"})
     )
-    fake_engine.event_queue.put_nowait(
-        Event(type="debate_end", payload={"reason": "done"})
-    )
+    fake_engine.event_queue.put_nowait(Event(type="debate_end", payload={"reason": "done"}))
 
     with client.stream("GET", "/api/debate/stream") as resp:
         assert resp.status_code == 200
@@ -357,9 +355,7 @@ def test_stream_emits_keepalive_on_timeout(fake_engine, client, monkeypatch):
         # Second call: deliver a terminal event so the stream finishes.
         return await real_wait_for(coro, timeout)
 
-    fake_engine.event_queue.put_nowait(
-        Event(type="debate_end", payload={"reason": "done"})
-    )
+    fake_engine.event_queue.put_nowait(Event(type="debate_end", payload={"reason": "done"}))
     monkeypatch.setattr("app.routes.debate.asyncio.wait_for", flaky_wait_for)
 
     with client.stream("GET", "/api/debate/stream") as resp:

@@ -1,10 +1,14 @@
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
 from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.messages import (
-    ModelMessage, PartStartEvent, PartDeltaEvent, TextPartDelta,
-    ThinkingPart, ThinkingPartDelta,
+    ModelMessage,
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPartDelta,
+    ThinkingPart,
+    ThinkingPartDelta,
 )
 
 

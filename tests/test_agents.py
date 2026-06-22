@@ -1,20 +1,17 @@
-import pytest
 from unittest.mock import MagicMock, patch
 
 from pydantic_ai.models import Model
+
 from app.agents import (
-    create_debater_agent,
-    create_judge_agent,
-    create_extractor_agent,
-    create_topic_refiner_agent,
-    DEBATE_RULES,
-    STANCE_INSTRUCTIONS,
-    JUDGE_PROMPT,
-    _build_debater_instructions,
     CONCESSION_INSTRUCTIONS,
-    STRATEGY_INSTRUCTIONS,
-    MEMORY_INSTRUCTIONS,
     EXTRACT_POINTS_PROMPT,
+    MEMORY_INSTRUCTIONS,
+    STRATEGY_INSTRUCTIONS,
+    _build_debater_instructions,
+    create_debater_agent,
+    create_extractor_agent,
+    create_judge_agent,
+    create_topic_refiner_agent,
 )
 from app.engine.state import DebaterDeps
 from app.models import Debater
@@ -164,14 +161,18 @@ def test_debater_agent_has_thinking_enabled():
 def test_debater_agent_no_search_has_thinking_enabled():
     """Same as test_debater_agent_has_thinking_enabled for the no-search variant."""
     with patch("app.agents._make_model", return_value=_mock_model()):
-        agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key", enable_search=False)
+        agent = create_debater_agent(
+            "deepseek-chat", "https://api.example.com", "test-key", enable_search=False
+        )
     settings = agent.model_settings or {}
     assert settings["extra_body"]["thinking"]["type"] == "enabled"
 
 
 def test_debater_agent_without_search_has_no_web_search_tool():
     with patch("app.agents._make_model", return_value=_mock_model()):
-        agent = create_debater_agent("deepseek-chat", "https://api.example.com", "test-key", enable_search=False)
+        agent = create_debater_agent(
+            "deepseek-chat", "https://api.example.com", "test-key", enable_search=False
+        )
     tool_names = list(agent._function_toolset.tools.keys())
     assert "web_search" not in tool_names
 

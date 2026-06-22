@@ -4,6 +4,7 @@
 (engine + repository on app.state), static mount, and route registration.
 ``main.py`` is now a thin shim that calls this factory.
 """
+
 from __future__ import annotations
 
 import random
@@ -39,6 +40,7 @@ _DEBATER_HOT_TAKES = [
 
 def create_app() -> FastAPI:
     """Build and return the configured FastAPI application."""
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.engine = DebateEngine(
@@ -68,7 +70,7 @@ def create_app() -> FastAPI:
             "message": random.choice(_DEBATER_HOT_TAKES),
             "debate_tip": "Remember: a strong argument addresses the counterargument head-on.",
             "api_notice": "This endpoint exists because Chrome DevTools requests it. "
-                          "We figured we'd have some fun with it.",
+            "We figured we'd have some fun with it.",
             "surprise": "🔥 You found the easter egg! Not all heroes wear capes — some just open DevTools.",
         }
 

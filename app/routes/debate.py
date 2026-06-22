@@ -1,4 +1,5 @@
 """Debate lifecycle routes: start, stream (SSE), message, stop, resume, judge."""
+
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +11,6 @@ from fastapi.responses import StreamingResponse
 
 from app.deps import DebaterRepository, get_debater_repository, get_engine
 from app.engine.debate import DebateEngine
-from app.engine.state import Event
 from app.models import DebateConfig, UserMessage
 
 logger = logging.getLogger(__name__)
@@ -181,7 +181,9 @@ async def judge_debate(engine: DebateEngine = Depends(get_engine)):
         raise HTTPException(status_code=400, detail="No active debate")
 
     if engine.state.active:
-        raise HTTPException(status_code=400, detail="Please stop the debate before requesting a judgment")
+        raise HTTPException(
+            status_code=400, detail="Please stop the debate before requesting a judgment"
+        )
 
     if engine.judge_task and not engine.judge_task.done():
         raise HTTPException(status_code=409, detail="Judgment already in progress")

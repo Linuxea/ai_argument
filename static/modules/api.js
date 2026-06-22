@@ -36,13 +36,31 @@ function formatErrorDetail(detail) {
     return String(detail ?? '');
 }
 
-async function call(method, path, body = null) {
+async function call(method, path, body = null, { timeout = 30000 } = {}) {
     const opts = { method, headers: {} };
     if (body !== null) {
         opts.headers['Content-Type'] = 'application/json';
         opts.body = JSON.stringify(body);
     }
-    const res = await fetch(path, opts);
+    // AbortController + timeout so a hung TCP connection can't lock the UI
+    // forever. The default 30s is generous enough for normal LLM endpoints;
+    // long-running calls (refine) can override.
+    const controller = new AbortController();
+    opts.signal = controller.signal;
+    const timer = setTimeout(() => controller.abort(), timeout);
+    let res;
+    try {
+        res = await fetch(path, opts);
+    } catch (err) {
+        clearTimeout(timer);
+        if (err.name === 'AbortError') {
+            const e = new Error('请求超时');
+            e.status = 0;
+            throw e;
+        }
+        throw err;
+    }
+    clearTimeout(timer);
     if (!res.ok) {
         let detail = `${res.status} ${res.statusText}`;
         try {
@@ -68,7 +86,8 @@ export const api = {
     sendMessage: (message) => call('POST', '/api/debate/message', { message }),
     requestJudge: () => call('POST', '/api/debate/judge'),
     createDebater: (payload) => call('POST', '/api/debaters', payload),
-    refineTopic: (topic) => call('POST', '/api/topic/refine', { topic }),
+    // Refine calls a real LLM; give it more headroom than the default 30s.
+    refineTopic: (topic) => call('POST', '/api/topic/refine', { topic }, { timeout: 60000 }),
 };
 
 // Exported for testing only. Not part of the public API.

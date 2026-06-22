@@ -1,8 +1,10 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.tools import web_search
+
+import pytest
+
 from app.engine.state import DebaterDeps
 from app.models import Debater
+from app.tools import web_search
 
 
 def _make_ctx(api_key: str = "test-key") -> MagicMock:
@@ -100,10 +102,7 @@ async def test_web_search_handles_api_error():
 async def test_web_search_truncates_long_results():
     ctx = _make_ctx(api_key="valid-key")
 
-    long_results = [
-        {"title": f"Result {i}", "description": "X" * 300}
-        for i in range(20)
-    ]
+    long_results = [{"title": f"Result {i}", "description": "X" * 300} for i in range(20)]
 
     mock_response = MagicMock()
     mock_response.json.return_value = {"web": {"results": long_results}}

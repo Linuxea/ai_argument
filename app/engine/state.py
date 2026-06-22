@@ -7,6 +7,7 @@ type parameter, but ``app.agents`` needs ``app.tools`` for the ``web_search``
 tool registration — so the deps dataclass must live in a module that neither
 imports (this one).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

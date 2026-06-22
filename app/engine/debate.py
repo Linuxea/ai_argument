@@ -1,4 +1,5 @@
 """Core debate engine: state management, prompt building, turn order, SSE events."""
+
 from __future__ import annotations
 
 import asyncio
@@ -79,7 +80,9 @@ class DebateEngine:
         self.api_key = api_key
         self.brave_api_key = brave_api_key
         self.debater_agent = create_debater_agent(model, base_url, api_key, enable_search=True)
-        self.debater_agent_no_search = create_debater_agent(model, base_url, api_key, enable_search=False)
+        self.debater_agent_no_search = create_debater_agent(
+            model, base_url, api_key, enable_search=False
+        )
         self.judge_agent = create_judge_agent(model, base_url, api_key)
         self._extractor_agent = create_extractor_agent(model, base_url, api_key)
         self.state: DebateState | None = None
@@ -117,7 +120,7 @@ class DebateEngine:
             # Drop oldest. Clients that reconnect after dropping out of the
             # window get a partial replay (newest 500 events) — better than
             # nothing, and the loss is logged on the client.
-            del self.event_log[:-self._event_log_max]
+            del self.event_log[: -self._event_log_max]
         await self.event_queue.put(event)
 
     async def emit_error(self, message: str, *, judge: bool = False) -> None:
@@ -238,14 +241,12 @@ class DebateEngine:
         except asyncio.CancelledError:
             if self.state:
                 self.state.active = False
-            await self._emit(
-                Event(type="debate_paused", payload={"reason": "Stopped by user"})
-            )
+            await self._emit(Event(type="debate_paused", payload={"reason": "Stopped by user"}))
             # Don't re-raise: cancellation is a user-driven, expected outcome
             # here. Re-raising would propagate to whoever awaits the task and
             # produce an "Task was destroyed but it is pending!" warning in
             # some asyncio configurations.
-        except Exception as exc:
+        except Exception:
             logger.exception("Debate loop failed")
             if self.state:
                 self.state.active = False
@@ -368,10 +369,12 @@ class DebateEngine:
                 _thinking_active = True
                 initial = event.part.content
                 if initial:
-                    await self._emit(Event(
-                        type="thinking_chunk",
-                        payload={"debater_name": debater.name, "text_chunk": initial},
-                    ))
+                    await self._emit(
+                        Event(
+                            type="thinking_chunk",
+                            payload={"debater_name": debater.name, "text_chunk": initial},
+                        )
+                    )
             elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
                 _thinking_active = await self._end_thinking(_thinking_active)
                 delta = event.delta.content_delta
@@ -388,10 +391,12 @@ class DebateEngine:
             # Handle PartDeltaEvent — ThinkingPartDelta
             elif isinstance(event, PartDeltaEvent) and isinstance(event.delta, ThinkingPartDelta):
                 delta = event.delta.content_delta
-                await self._emit(Event(
-                    type="thinking_chunk",
-                    payload={"debater_name": debater.name, "text_chunk": delta},
-                ))
+                await self._emit(
+                    Event(
+                        type="thinking_chunk",
+                        payload={"debater_name": debater.name, "text_chunk": delta},
+                    )
+                )
             elif isinstance(event, FunctionToolCallEvent):
                 args = event.part.args
                 if isinstance(args, str):
@@ -408,15 +413,17 @@ class DebateEngine:
                     result_text = str(event.result.content)[:200]
                 call_id = getattr(event, "tool_call_id", "") or ""
                 query = pending_tool_queries.pop(call_id, "")
-                await self._emit(Event(
-                    type="tool_call",
-                    payload={
-                        "debater_name": debater.name,
-                        "tool_name": "web_search",
-                        "query": query,
-                        "result_summary": result_text,
-                    },
-                ))
+                await self._emit(
+                    Event(
+                        type="tool_call",
+                        payload={
+                            "debater_name": debater.name,
+                            "tool_name": "web_search",
+                            "query": query,
+                            "result_summary": result_text,
+                        },
+                    )
+                )
             elif isinstance(event, AgentRunResultEvent):
                 result_all_messages = event.result.all_messages()
 
@@ -452,9 +459,7 @@ class DebateEngine:
         the task is tracked in ``_extraction_tasks`` so ``stop()`` /
         ``start()`` can cancel stragglers cleanly.
         """
-        task = asyncio.create_task(
-            self._extract_key_points(debater_name, full_text, round_number)
-        )
+        task = asyncio.create_task(self._extract_key_points(debater_name, full_text, round_number))
         self._extraction_tasks.add(task)
         task.add_done_callback(self._extraction_tasks.discard)
 
@@ -610,7 +615,7 @@ class DebateEngine:
                             payload={"text_chunk": delta},
                         )
                     )
-        except Exception as exc:
+        except Exception:
             logger.exception("Judge generation failed")
             await self._emit(
                 Event(

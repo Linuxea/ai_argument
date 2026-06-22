@@ -1,4 +1,5 @@
 """Application settings (Pydantic Settings) and cached preset loading."""
+
 from __future__ import annotations
 
 from functools import lru_cache

@@ -34,11 +34,10 @@ function dismiss(el) {
 function show(message, type = 'info', { duration = DEFAULT_DURATION } = {}) {
     const root = ensureContainer();
 
-    // Cap stack size
+    // Cap stack size. Let `dismiss` run its animation; the slot frees as
+    // soon as the animationend handler removes the node.
     while (root.children.length >= MAX_TOASTS) {
         dismiss(root.firstElementChild);
-        // Force-remove immediately to avoid blocking
-        root.firstElementChild?.remove();
     }
 
     const t = document.createElement('div');
@@ -87,4 +86,6 @@ export const toast = {
     error:   (msg, opts) => show(msg, 'error', opts),
     info:    (msg, opts) => show(msg, 'info', opts),
     warn:    (msg, opts) => show(msg, 'warn', opts),
+    /** Dismiss a specific toast element returned by show/info/warn/etc. */
+    dismiss: (el) => dismiss(el),
 };

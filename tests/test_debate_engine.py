@@ -6,7 +6,7 @@ import pytest
 
 from app.engine.debate import DebateEngine
 from app.engine.state import DebateState, Message
-from app.models import Debater, ArgumentSummary
+from app.models import ArgumentSummary, Debater
 from tests.conftest import MockDebateAgent
 
 
@@ -194,7 +194,7 @@ def test_acquire_consumer_enforces_single_slot():
     """M5: a second concurrent consumer must be rejected so events aren't
     split between two waiters on event_queue.get()."""
     engine, _ = _make_engine()
-    assert engine.acquire_consumer() is True   # first caller wins
+    assert engine.acquire_consumer() is True  # first caller wins
     assert engine.acquire_consumer() is False  # second is rejected
     engine.release_consumer()
     # Slot is free again.
@@ -364,9 +364,7 @@ async def test_run_loop_respects_max_rounds():
     debater_a = Debater(name="A", personality="You are A.")
     debater_b = Debater(name="B", personality="You are B.")
 
-    engine.state = DebateState(
-        topic="Test topic", debaters=[debater_a, debater_b], max_rounds=2
-    )
+    engine.state = DebateState(topic="Test topic", debaters=[debater_a, debater_b], max_rounds=2)
     engine._history = {"A": [], "B": []}  # Initialize per-debater history
 
     await engine.run_loop()
@@ -524,8 +522,7 @@ async def test_run_turn_thinking_followed_by_finalize():
 
     last_thinking_idx = max(i for i, e in enumerate(events) if e.type == "thinking_chunk")
     first_finalize_after = next(
-        i for i, e in enumerate(events)
-        if e.type == "debater_finalize" and i > last_thinking_idx
+        i for i, e in enumerate(events) if e.type == "debater_finalize" and i > last_thinking_idx
     )
     assert first_finalize_after > last_thinking_idx
 
@@ -580,7 +577,7 @@ async def test_extract_key_points_appends_summary():
 @pytest.mark.asyncio
 async def test_extract_key_points_handles_json_error():
     engine, _ = _make_engine()
-    engine._extractor_agent = MockDebateAgent(responses=['not valid json'])
+    engine._extractor_agent = MockDebateAgent(responses=["not valid json"])
     debater = Debater(name="Alice", personality="Test.")
     engine.state = DebateState(topic="Test", debaters=[debater])
 
@@ -614,7 +611,9 @@ def test_build_user_prompt_includes_summaries():
         ],
         argument_summaries=[
             ArgumentSummary(round=0, debater_name="Skeptic", points=["Teachers need empathy"]),
-            ArgumentSummary(round=0, debater_name="Optimist", points=["AI can personalize learning"]),
+            ArgumentSummary(
+                round=0, debater_name="Optimist", points=["AI can personalize learning"]
+            ),
         ],
     )
 

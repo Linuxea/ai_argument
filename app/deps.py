@@ -5,6 +5,7 @@ The engine and repository instances are stored on ``app.state`` during
 ``create_app`` lifespan startup; the providers here expose them to routes via
 ``Depends``.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -76,9 +77,7 @@ def get_debater_repository(request: Request) -> DebaterRepository:
     Same readiness contract as ``get_engine``: 503 if lifespan hasn't seeded
     the repository yet.
     """
-    repo: DebaterRepository | None = getattr(
-        request.app.state, "debater_repository", None
-    )
+    repo: DebaterRepository | None = getattr(request.app.state, "debater_repository", None)
     if repo is None:
         raise HTTPException(status_code=503, detail="Service not ready")
     return repo

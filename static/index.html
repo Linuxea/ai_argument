@@ -10,9 +10,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Source+Sans+Pro:wght@300;400;600;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles/main.css?v=20">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <link rel="stylesheet" href="/static/styles/main.css?v=21">
+    <!-- Pin CDN deps to specific versions to avoid silent breaking changes.
+         TODO: regenerate SRI hashes with `openssl dgst -sha384 -binary <file> | openssl base64 -A`
+         and add integrity="..." attributes once we're on a network with registry access. -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" defer></script>
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
 </head>
 <body>
     <div class="app" id="app">
@@ -84,7 +87,7 @@
                 </div>
             </header>
 
-            <div class="round-progress" id="round-progress" aria-hidden="true">
+            <div class="round-progress" id="round-progress" role="progressbar" aria-label="辩论进度" aria-valuemin="0" aria-valuemax="100">
                 <div class="round-progress-fill" id="round-progress-fill"></div>
             </div>
 
@@ -127,6 +130,6 @@
         <div id="search-results" class="search-results"></div>
     </dialog>
 
-    <script type="module" src="/static/app.js?v=20"></script>
+    <script type="module" src="/static/app.js?v=21"></script>
 </body>
 </html>

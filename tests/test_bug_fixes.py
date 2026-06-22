@@ -6,10 +6,11 @@ nominally covers B1–B32, but 11 IDs (B13, B14, B17, B23, B24, B26–B29, B31,
 B32) were either merged into sibling tests or never independently fixed and
 have no dedicated regression test here. B33 is post-audit.
 """
+
 from __future__ import annotations
 
 import asyncio
-import json
+import contextlib
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,13 +19,12 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.deps import get_engine
-from app.engine.debate import DebateEngine, _parse_extractor_output
-from app.engine.state import DebateState, Event, Message
+from app.engine.debate import _parse_extractor_output
+from app.engine.state import DebateState, Event
 from app.models import DebateConfig, Debater
 from main import app
 from tests.conftest import MockDebateAgent
 from tests.test_coverage_extras import _bare_engine
-
 
 # ---------------------------------------------------------------------------
 # B9: DebateConfig.max_rounds bounded
@@ -110,9 +110,9 @@ async def test_b12_web_search_handles_missing_title():
     mock_response.json.return_value = {
         "web": {
             "results": [
-                {"description": "no title here"},          # missing title — used to KeyError
+                {"description": "no title here"},  # missing title — used to KeyError
                 {"title": "Real Result", "description": "ok"},
-                {"title": "Also OK"},                       # missing description — used .get already
+                {"title": "Also OK"},  # missing description — used .get already
             ]
         }
     }
@@ -511,10 +511,8 @@ async def test_b2_stop_cancels_running_loop_task():
     eng.stop()
 
     # Wait a tick for cancellation to land.
-    try:
+    with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
         await asyncio.wait_for(eng._loop_task, timeout=1.0)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        pass
 
     assert cancelled.is_set(), "stop() did not cancel the loop task"
     assert eng.state.active is False
@@ -555,10 +553,9 @@ async def test_b2_cancellation_emits_debate_paused():
 
 def test_b22_judge_returns_409_when_already_judging():
     """Posting /judge twice in a row must not start two judge tasks."""
+
     class CheapStub:
-        state = DebateState(
-            topic="t", debaters=[Debater(name="x", personality="p")], active=False
-        )
+        state = DebateState(topic="t", debaters=[Debater(name="x", personality="p")], active=False)
         event_queue = asyncio.Queue()
         judge_task = MagicMock(done=MagicMock(return_value=False))
 
@@ -580,9 +577,7 @@ def test_b7_background_task_keeps_strong_reference():
     from app.routes.debate import _BACKGROUND_TASKS
 
     class CheapStub:
-        state = DebateState(
-            topic="t", debaters=[Debater(name="x", personality="p")], active=False
-        )
+        state = DebateState(topic="t", debaters=[Debater(name="x", personality="p")], active=False)
         event_queue = asyncio.Queue()
         judge_task = None
 
@@ -596,7 +591,7 @@ def test_b7_background_task_keeps_strong_reference():
     app.dependency_overrides[get_engine] = lambda: eng
     try:
         client = TestClient(app)
-        before = len(_BACKGROUND_TASKS)
+        len(_BACKGROUND_TASKS)
         resp = client.post("/api/debate/judge")
         assert resp.status_code == 200
         # By the time the response returns, the task may or may not still be
@@ -682,9 +677,7 @@ def test_b6_sse_replays_on_last_event_id_header():
     try:
         client = TestClient(app)
         # Reconnect with Last-Event-ID = 1 → expect events 2 and 3 replayed.
-        with client.stream(
-            "GET", "/api/debate/stream", headers={"Last-Event-ID": "1"}
-        ) as resp:
+        with client.stream("GET", "/api/debate/stream", headers={"Last-Event-ID": "1"}) as resp:
             body = "".join(resp.iter_text())
         assert "id: 2" in body
         assert "id: 3" in body
@@ -752,8 +745,8 @@ async def test_b10_tool_call_query_keyed_by_call_id():
     events = [
         _call({"query": "first"}, "id-A"),
         _call({"query": "second"}, "id-B"),
-        _result("res-B", "id-B"),       # B's result arrives first
-        _result("res-A", "id-A"),       # then A's
+        _result("res-B", "id-B"),  # B's result arrives first
+        _result("res-A", "id-A"),  # then A's
         AgentRunResultEvent(result=final),
     ]
 
@@ -763,6 +756,7 @@ async def test_b10_tool_call_query_keyed_by_call_id():
                 async def __aiter__(self_):
                     for e in events:
                         yield e
+
             return _Iter()
 
     eng = _bare_engine()

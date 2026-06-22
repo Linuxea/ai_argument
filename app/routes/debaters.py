@@ -1,4 +1,5 @@
 """Debater routes: list presets/custom debaters and create custom ones."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
