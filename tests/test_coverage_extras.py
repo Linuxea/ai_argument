@@ -26,6 +26,7 @@ from app.deps import (
     get_settings,
 )
 from app.engine.debate import DebateEngine
+from app.engine.event_bus import EventBus
 from app.engine.state import DebateState, Event
 from app.models import Debater
 from tests.conftest import MockDebateAgent
@@ -47,10 +48,7 @@ def _bare_engine() -> DebateEngine:
     eng.judge_agent = MagicMock()
     eng._extractor_agent = MagicMock()
     eng.state = None
-    eng.event_queue = asyncio.Queue()
-    eng.event_log = []
-    eng._event_log_max = 500
-    eng._next_event_id = 1
+    eng._events = EventBus()
     eng._loop_task = None
     eng.judge_task = None
     eng._history = {}

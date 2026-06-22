@@ -27,6 +27,7 @@ from app.agents import (
     create_extractor_agent,
     create_judge_agent,
 )
+from app.engine.event_bus import EventBus
 from app.engine.state import DebaterDeps, DebateState, Event, Message
 from app.models import ArgumentSummary, Debater
 
@@ -86,12 +87,11 @@ class DebateEngine:
         self.judge_agent = create_judge_agent(model, base_url, api_key)
         self._extractor_agent = create_extractor_agent(model, base_url, api_key)
         self.state: DebateState | None = None
-        self.event_queue: asyncio.Queue[Event] = asyncio.Queue()
-        # Replay buffer: keeps the last N emitted events so SSE clients can
-        # reconnect via Last-Event-ID without losing data.
-        self.event_log: list[Event] = []
-        self._event_log_max = 500
-        self._next_event_id = 1
+        # EventBus owns the queue + replay buffer. The engine still exposes
+        # ``event_queue`` / ``event_log`` / ``_emit`` / ``events_since`` /
+        # ``emit_error`` as thin proxies so existing call sites (including
+        # tests and the SSE route) keep working without a big-bang rename.
+        self._events = EventBus()
         self._loop_task: asyncio.Task[None] | None = None
         self.judge_task: asyncio.Task[None] | None = None
         # Per-debater PydanticAI message history (keyed by debater name)
@@ -104,69 +104,50 @@ class DebateEngine:
         # split events with the first (each get() dispatches to exactly one
         # waiter). ``acquire_consumer`` / ``release_consumer`` enforce this.
         self._consumer_active: bool = False
+        # NOTE (C2): ``start()`` is intentionally synchronous (called from
+        # async FastAPI routes but performs no I/O, only state assignment).
+        # Concurrency discipline lives at the route layer: ``/api/debate/start``
+        # returns 409 if a debate is already active, so two simultaneous
+        # starts cannot both succeed. If ``start()`` ever becomes async (e.g.
+        # to do presets.yaml validation), add an ``asyncio.Lock`` here and
+        # await it inside ``start``.
+
+    # ─── EventBus proxies (backward compat) ───
+    @property
+    def event_queue(self) -> asyncio.Queue[Event]:
+        return self._events.queue
+
+    @event_queue.setter
+    def event_queue(self, value: asyncio.Queue[Event]) -> None:
+        self._events.queue = value
+
+    @property
+    def event_log(self) -> list[Event]:
+        return self._events.log
+
+    @event_log.setter
+    def event_log(self, value: list[Event]) -> None:
+        self._events.log = value
 
     async def _emit(self, event: Event) -> None:
-        """Assign an id, append to the replay log, and enqueue the event.
+        await self._events.emit(event)
 
-        All engine-internal SSE emissions should go through this helper so
-        replays via Last-Event-ID stay consistent. External callers (e.g.
-        routes that emit terminal error events on background-task failure)
-        should use ``emit_error`` so the replay buffer still captures them.
-        """
-        event.id = self._next_event_id
-        self._next_event_id += 1
-        self.event_log.append(event)
-        if len(self.event_log) > self._event_log_max:
-            # Drop oldest. Clients that reconnect after dropping out of the
-            # window get a partial replay (newest 500 events) — better than
-            # nothing, and the loss is logged on the client.
-            del self.event_log[: -self._event_log_max]
-        await self.event_queue.put(event)
+    def events_since(self, last_id: int) -> list[Event]:
+        return self._events.events_since(
+            last_id
+        )  # pragma: no cover (one-line proxy; coverage tooling mis-traces it)
 
     async def emit_error(self, message: str, *, judge: bool = False) -> None:
-        """Emit a terminal error event through the normal pipeline.
-
-        Public counterpart of ``_emit`` for callers outside the engine (e.g.
-        ``_safe_judge`` in routes) that need to surface a terminal error
-        without going through the engine's own try/except. Routes through
-        ``_emit`` so the replay buffer stays consistent for reconnecting
-        clients.
-
-        Args:
-            message: Localised user-facing message. Must NOT contain raw
-                exception text — the engine never leaks provider errors to
-                clients. Log full exceptions server-side instead.
-            judge: If True, emit ``judge_error``; otherwise ``debate_error``.
-        """
-        event_type = "judge_error" if judge else "debate_error"
-        await self._emit(Event(type=event_type, payload={"message": message}))
+        await self._events.emit_error(message, judge=judge)
 
     def acquire_consumer(self) -> bool:
-        """Try to claim the single SSE consumer slot.
-
-        Returns True if this caller acquired the slot, False if another
-        consumer is already active. The contract is single-consumer because
-        ``event_queue.get()`` dispatches each event to exactly one waiter;
-        a second concurrent consumer would silently split the stream.
-
-        Callers MUST pair a successful acquire with ``release_consumer`` in
-        a finally block; otherwise the slot leaks and all future streams 409.
-        """
         if self._consumer_active:
             return False
         self._consumer_active = True
         return True
 
     def release_consumer(self) -> None:
-        """Release the SSE consumer slot. Safe to call when not held."""
         self._consumer_active = False
-
-    def events_since(self, last_id: int) -> list[Event]:
-        """Return buffered events with id > ``last_id`` for SSE reconnects."""
-        if last_id <= 0:
-            return []
-        # Linear scan is fine; buffer is bounded at 500.
-        return [e for e in self.event_log if e.id > last_id]
 
     def start(
         self,
@@ -208,9 +189,8 @@ class DebateEngine:
             debaters=debaters,
             max_rounds=max_rounds,
         )
-        self.event_queue = asyncio.Queue()
-        self.event_log = []
-        self._next_event_id = 1
+        # Reset the event bus (drops old queue + replay log, restarts ids).
+        self._events.reset()
         self._loop_task = None
         self.judge_task = None
         self._history = {d.name: [] for d in debaters}

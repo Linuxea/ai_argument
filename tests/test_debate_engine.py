@@ -5,14 +5,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.engine.debate import DebateEngine
-from app.engine.state import DebateState, Message
+from app.engine.event_bus import EventBus
+from app.engine.state import DebateState, Event, Message
 from app.models import ArgumentSummary, Debater
 from tests.conftest import MockDebateAgent
 
 
 def _make_engine(responses=None):
     """Create a DebateEngine with mocked agents."""
-    import asyncio
 
     mock = MockDebateAgent(responses=responses)
     engine = object.__new__(DebateEngine)
@@ -25,10 +25,7 @@ def _make_engine(responses=None):
     engine.judge_agent = MockDebateAgent(responses=responses or ["Judgment."])
     engine._extractor_agent = MockDebateAgent(responses=['{"points": ["mock claim"]}'])
     engine.state = None
-    engine.event_queue = asyncio.Queue()
-    engine.event_log = []
-    engine._event_log_max = 500
-    engine._next_event_id = 1
+    engine._events = EventBus()
     engine._loop_task = None
     engine.judge_task = None
     engine._history = {}
@@ -175,7 +172,8 @@ async def test_emit_error_routes_through_emit_and_assigns_event_type():
     route through _emit (so replay buffer captures it) and pick the right
     event type based on the ``judge`` flag."""
     engine, _ = _make_engine()
-    engine.event_queue = __import__("asyncio").Queue()
+    # Use a fresh queue so we can drain it cleanly below.
+    engine._events.queue = asyncio.Queue()
 
     await engine.emit_error("oops", judge=False)
     await engine.emit_error("judge oops", judge=True)
@@ -188,6 +186,58 @@ async def test_emit_error_routes_through_emit_and_assigns_event_type():
     # Both events got replay-buffer ids (proves they went through _emit).
     assert all(e.id > 0 for e in events)
     assert len(engine.event_log) == 2
+
+
+@pytest.mark.asyncio
+async def test_event_bus_events_since_skips_non_positive_ids():
+    """EventBus.events_since(0) (or negative) returns [] — there is nothing
+    'after' a non-id. This is the documented boundary behaviour."""
+    bus = EventBus()
+    await bus.emit(Event(type="x", payload={}))
+    assert bus.events_since(0) == []
+    assert bus.events_since(-1) == []
+    # A real id returns the events after it.
+    assert len(bus.events_since(1)) == 0  # event 1 itself has id 1, not > 1
+    await bus.emit(Event(type="y", payload={}))
+    since1 = bus.events_since(1)
+    assert len(since1) == 1
+    assert since1[0].id == 2
+
+
+@pytest.mark.asyncio
+async def test_event_bus_reset_clears_state():
+    """EventBus.reset drops queue + log; ids restart at 1."""
+    bus = EventBus()
+    await bus.emit(Event(type="x", payload={}))
+    await bus.emit(Event(type="y", payload={}))
+    assert len(bus.log) == 2
+    bus.reset()
+    assert bus.log == []
+    assert bus._next_id == 1
+
+
+def test_engine_event_proxy_setters_work():
+    """The engine's backward-compat property setters (event_queue, event_log)
+    forward to the underlying EventBus so legacy test code that assigns
+    directly keeps working."""
+    engine, _ = _make_engine()
+    new_q = asyncio.Queue()
+    engine.event_queue = new_q
+    assert engine._events.queue is new_q
+    engine.event_log = []
+    assert engine._events.log == []
+
+
+@pytest.mark.asyncio
+async def test_engine_events_since_proxies_to_bus():
+    """The engine.events_since proxy delegates to EventBus.events_since."""
+    engine, _ = _make_engine()
+    await engine._emit(Event(type="a", payload={}))
+    await engine._emit(Event(type="b", payload={}))
+    # Events with id > 1 (just the second one).
+    out = engine.events_since(1)
+    assert len(out) == 1
+    assert out[0].type == "b"
 
 
 def test_acquire_consumer_enforces_single_slot():

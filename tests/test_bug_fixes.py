@@ -648,7 +648,7 @@ async def test_b6_events_since_zero_returns_nothing():
 async def test_b6_replay_log_bounded():
     """Buffer must drop old events to stay under the size cap."""
     eng = _bare_engine()
-    eng._event_log_max = 10
+    eng._events._max_log = 10
     for i in range(25):
         await eng._emit(Event(type=f"e{i}", payload={"i": i}))
     assert len(eng.event_log) == 10
