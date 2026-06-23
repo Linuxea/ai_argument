@@ -11,16 +11,20 @@ Operational cheat sheet for OpenCode sessions. Covers the full architecture (Pyd
 .venv/bin/python -m pytest tests/test_debate_engine.py::test_start_raises_error_on_empty_debaters -v  # one test
 .venv/bin/python -m pytest tests/ --cov=app --cov-report=term-missing                # coverage
 
-# Frontend (Node 22+, vanilla ES modules, no build step)
+# Frontend unit (Node 22+, vanilla ES modules, no build step)
 npm test                                                                             # node --test 'tests-js/*.test.js'
 node --test tests-js/renderer.test.js                                                # one file
+
+# Frontend e2e (Playwright; chromium reused from playwright cache)
+npm run test:e2e                                                                     # all e2e (npx playwright install chromium first time)
+CHROMIUM_EXECUTABLE_PATH=/path/to/chrome npm run test:e2e                            # download-constrained envs
 
 # Run server
 python -m uvicorn main:app --reload --port 8000
 ./start.sh [port]                                                                    # also runs pip install -r
 ```
 
-Backend and frontend are **two independent test suites with no shared runner**. Run both before declaring work done.
+Three independent suites with no shared runner (`pytest`, `npm test`, `npm run test:e2e`). Run all three before declaring work done.
 
 ## Architecture
 
@@ -36,8 +40,12 @@ Each agent uses `DebaterDeps` for dependency injection (topic, debater config, r
 
 ### Core Algorithm: Prompt Building
 
-In `app/engine/debate.py:_build_user_prompt()`, for each debater's turn:
+Prompts are composed in **two layers**:
 
+1. **Content** lives in `prompts/*.md` (debate_rules / search_instructions / strategy_instructions / memory_instructions / judge / extract_points / topic_refine), loaded once at import by `_load_prompt()` in `app/agents.py`. Edit a `.md` file to change wording — no Python touch, no ruff/coverage cycle.
+2. **User-prompt assembly** (the per-turn payload) is a pure function `build_user_prompt(state, debater)` in `app/engine/prompt.py`. `DebateEngine._build_user_prompt` is a one-line wrapper. Unit-testable without constructing an engine (`tests/test_prompt.py`).
+
+For each debater's turn:
 - **Other** debaters' messages → `[Name]: content` in the user prompt
 - Debater's **own** past messages → excluded from user prompt (already in `message_history` as prior `ModelResponse` entries managed by PydanticAI)
 - **First turn** (empty history) → opening-statement prompt instead of debate history
@@ -78,10 +86,12 @@ The backend is organised as an `app/` package; `main.py` is a thin shim (`app = 
 
 | File | Purpose |
 |------|---------|
-| `app/engine/debate.py` | Core logic: state, prompt building, turn order, SSE event emission |
+| `app/engine/debate.py` | `DebateEngine` — state, turn loop, SSE emission. Agents injected via `AgentBundle` (kwarg-only); production passes `agents=None` and gets the real PydanticAI agents, tests pass a mock bundle. |
+| `app/engine/prompt.py` | `build_user_prompt(state, debater)` — pure function, no engine/agent. The engine delegates here. |
 | `app/engine/state.py` | `Message` / `DebateState` / `Event` dataclasses (stdlib-only) |
-| `app/agents.py` | PydanticAI agent definitions, prompt templates (`DEBATE_RULES`, `STANCE_INSTRUCTIONS`, `SEARCH_INSTRUCTIONS`, `JUDGE_PROMPT`), `DebaterDeps` |
-| `app/tools.py` | `web_search` PydanticAI tool with Brave Search API + rate limiting |
+| `app/agents.py` | PydanticAI agent factories (`create_debater_agent` etc.); prompt constants loaded from `prompts/*.md` via `_load_prompt()`; `STANCE_INSTRUCTIONS` dict + the personality-framing logic stay inline. |
+| `prompts/*.md` | Externalised prompt content (debate_rules, search, strategy, memory, judge, extract_points, topic_refine). Edit here, not Python. |
+| `app/tools.py` | `web_search` PydanticAI tool with Brave Search API + 1 req/sec rate limiting + graceful HTTP/JSON error handling (returns a string the LLM sees). |
 | `app/routes/*.py` | FastAPI routers (debate / debaters / topic), dependencies via `Depends` |
 | `app/deps.py` | `get_engine` / `get_debater_repository` providers + `DebaterRepository` |
 | `app/__init__.py` | `create_app()` factory: lifespan, static mount, router registration |
@@ -103,10 +113,12 @@ static/
 │   ├── sse.js              # SSEClient extends EventSource wrapper
 │   ├── state.js            # UIState FSM (idle/debating/paused/stopped/judging)
 │   ├── markdown.js         # marked config + [[Name]] mention decoration
-│   ├── renderer.js         # streaming bubbles, thinking section, tool cards, judge turn
+│   ├── bubble.js           # pure DOM factories: debater bubble / skeleton / thinking / tool-card / system / user
+│   ├── renderer.js         # streaming state machine (rAF batching, append/finalize). Delegates DOM build to bubble.js.
+│   ├── store.js            # MessageStore — canonical record of finalised messages (search reads it; download still on DOM, follow-up)
 │   ├── autoscroll.js       # sentinel + IntersectionObserver + floating jump button
 │   ├── debaters.js         # debater list render, HTML5 drag reorder, keyboard reorder
-│   ├── search.js           # <dialog> search with highlight + jump
+│   ├── search.js           # <dialog> search, reads MessageStore (not DOM)
 │   ├── theme.js            # light/dark + View Transitions API
 │   ├── toast.js            # capped notification stack
 │   └── utils.js            # escapeHtml, sanitizeColor, debounce, icon, refreshIcons
@@ -136,10 +148,17 @@ Key frontend patterns:
 ## Test conventions (non-obvious)
 
 - **Backend coverage is at 100% and enforced** by `pyproject.toml`'s `[tool.pytest.ini_options]` (`--cov-fail-under=100`). Any new code path in `app/` needs a test. Don't add `# pragma: no cover` casually.
-- **Bug-fix tests live in `tests/test_bug_fixes.py`** named `test_bN_<topic>` where N matches the audit ID. The historical audit covers B1–B32, but **11 IDs (B13, B14, B17, B23, B24, B26–B29, B31, B32) have no regression test** — they were either merged into other tests or never independently fixed. When fixing a regression, continue the `test_bN_*` convention.
-- **Engine tests build via `object.__new__(DebateEngine)` + manual attribute init**, NOT via `__init__` (which constructs real PydanticAI agents needing API keys). There is a **single shared helper `_make_engine()` in `tests/conftest.py`** — when you add an attribute to `DebateEngine`, update it (previously two helpers existed; they were consolidated).
-- **Frontend tests use jsdom** with central stubs in `tests-js/helpers/jsdom-env.js` for `matchMedia`, `CSS.escape`, `IntersectionObserver`, and `HTMLDialogElement.showModal`. `EventSource` is stubbed per-test-file (`tests-js/sse.test.js`) because it carries test-specific behavior. Every test file must call `setupDom()` before importing from `static/`.
-- **marked and lucide are vendored but absent in tests.** Each frontend test file defines its own inline `globalThis.window.marked = {…}` stub (there is **no shared stub file** despite old docs claiming `tests-js/helpers/marked-stub.js`). `markdown.js` degrades to plain-text without `window.marked`; `utils.refreshIcons()` is a no-op without `window.lucide`. The `markdown.test.js` stub is the faithful one — it runs raw HTML through a `renderer.html` override the way real marked does, so it catches XSS/escape regressions; mirror that behaviour when adding markdown tests.
+- **Bug-fix regression tests** live in `tests/test_bug_fixes.py`, named `test_bN_<topic>` where N is the audit ID. New regressions should keep the convention; the historical B-list catalog is not load-bearing.
+- **Engine tests inject mock agents via `AgentBundle`**, NOT `object.__new__`. Construct with normal `__init__`:
+  ```python
+  from app.engine.debate import AgentBundle, DebateEngine
+  engine = DebateEngine(model="test:model", agents=AgentBundle(
+      debater=mock, debater_no_search=mock, judge=mock, extractor=mock))
+  ```
+  The helpers `_make_engine` (`tests/test_debate_engine.py`) and `_bare_engine` (`tests/test_coverage_extras.py`) follow this pattern. Pure prompt logic is tested without an engine at all (`tests/test_prompt.py` calls `build_user_prompt` directly).
+- **Frontend e2e** lives in `tests-e2e/`. Run with `npm run test:e2e` (after `npx playwright install chromium` once). The webServer config launches `python3 -m http.server 8765` from repo root so the page's `/static/...` paths resolve. Smoke spec covers vendored-deps load, F1 toggle default, real-marked `[[Name]]` rendering, and the residual-`[退让]` degradation.
+- **Frontend unit tests use jsdom** with central stubs in `tests-js/helpers/jsdom-env.js` for `matchMedia`, `CSS.escape`, `IntersectionObserver`, and `HTMLDialogElement.showModal`. `EventSource` is stubbed per-test-file (`tests-js/sse.test.js`). Every test file must call `setupDom()` before importing from `static/`. jsdom devDep is `^25` (not `^29` — older claim was stale).
+- **marked and lucide are vendored but absent in tests.** Each frontend test file defines its own inline `globalThis.window.marked = {…}` stub (no shared stub file). `markdown.js` degrades to plain-text without `window.marked`; `utils.refreshIcons()` is a no-op without `window.lucide`. The `markdown.test.js` stub is the faithful one — it runs raw HTML through a `renderer.html` override the way real marked does, so it catches XSS/escape regressions; mirror that behaviour when adding markdown tests.
 - `asyncio_mode = "auto"` in `pyproject.toml` — async tests don't need `@pytest.mark.asyncio` (adding it is harmless).
 
 ## Constraints an agent would miss
@@ -150,7 +169,7 @@ Key frontend patterns:
 - **`stop()` cancels `_loop_task` to interrupt the in-flight turn.** It's a sync method by design (called from a sync route handler). Don't make it await-able.
 - **All engine SSE emissions go through `engine._emit(Event(...))`**, not direct `event_queue.put`. `_emit` assigns the monotonic id and appends to the 500-event replay buffer that powers `Last-Event-ID` reconnect. **Terminal error events also go through `_emit`** so that a reconnecting client sees them on replay.
 - **Single-user, in-memory, no persistence, no auth.** Don't add user-scoping, DB layers, or auth unless the product actually changes.
-- **LLM layer is PydanticAI Agents** (`app/agents.py`). `app/routes/topic.py` currently does a one-shot topic-refine via raw `AsyncOpenAI`; the plan is to migrate it to a PydanticAI agent too.
+- **LLM layer is PydanticAI Agents** end-to-end (`app/agents.py`). All four agents (debater w/ + w/o search, judge, extractor) plus topic-refine go through `create_*_agent` factories with a uniform `OpenAIChatModel` provider configured by `.env`.
 - **Frontend is vanilla JS ES modules** — no bundler, no JSX, no framework. `static/index.html` loads everything via `<script type="module">`. Don't introduce a build step lightly.
 - **Stance values are Chinese literals** (`正方` / `反方` / `中立`), centralised as `app/models.Stance = Literal[...]` and reused by `STANCE_INSTRUCTIONS`. UI text and presets are in Chinese; match this when adding strings.
 - **Presets live in `app/presets.yaml`**, loaded once via `lru_cache` and validated fail-fast at lifespan startup. Editing the YAML changes preset debaters without code changes — no migration needed.
