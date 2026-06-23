@@ -1,285 +1,97 @@
 # AI Debate Chatroom
 
-A personal web-based tool where AI debaters with different personas discuss a user-chosen topic in real-time. Watch the debate unfold, participate by injecting messages, and request a judge's analysis.
+A personal web tool: multiple AI debaters with distinct personas argue a topic in real time. SSE streaming, thinking display, optional web search, and a judge that can call it.
 
-> **Note:** The UI and preset debater personas are in Chinese (简体中文).
+> UI labels and preset personas are 简体中文. The code is English.
 
 ## Features
 
-- **Multiple AI Debaters**: 3 preset personas (正方/反方/分析家) + custom debaters
-- **Real-time Streaming**: SSE-based token-by-token message streaming with thinking/reasoning display
-- **Web Search**: AI debaters can search the web (via Brave Search) for evidence during debates
-- **User Participation**: Join the debate at any time
-- **Topic Refinement**: AI-powered topic optimization for better debate quality
-- **Judge Mode**: Get an impartial analysis of the debate
-- **OpenAI-Compatible**: Works with any OpenAI-compatible API (DeepSeek, Ollama, vLLM, LM Studio, etc.)
+- **Multi-party debate** — preset 正方 / 反方 / 分析家, plus custom debaters with your own personality prompts
+- **Real-time SSE streaming** — token-by-token, including the model's thinking/reasoning when the provider exposes it
+- **Web search mid-debate** via Brave Search; round 1 is research, round 2+ is conservation mode (max 1 search/round)
+- **OpenAI-compatible** — DeepSeek / Volcengine Ark / Ollama / vLLM / LM Studio / OpenAI itself; anything speaking the protocol
+- **Global search kill-switch** that respects per-debater `enable_search` (turning it ON never grants search to a debater whose preset disables it)
+- **Per-debater bubble tint** so you can tell speakers apart at a glance, plus default-expanded thinking sections and tool cards
+- **Editable prompt templates** in `prompts/*.md` — change the wording without touching Python, no ruff/coverage/test cycle
+- **Single-user, in-memory** by design — no auth, no database
 
-## Quick Start
+## Quick start
 
-### 1. Install Dependencies
+Requires Python 3.10+. Node 22+ only if you want to run the frontend tests.
 
 ```bash
+./start.sh                # creates .venv, installs via Aliyun mirror, runs uvicorn on :8000
+# or manually:
 pip install -r requirements.txt
-```
-
-Or use the startup script (installs deps and starts server):
-
-```bash
-./start.sh [port]
-```
-
-### 2. Configure API Key
-
-Create a `.env` file in the project root:
-
-```env
-API_KEY="your-api-key-here"
-```
-
-Full `.env` options:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `API_BASE_URL` | `https://api.deepseek.com` | OpenAI-compatible API endpoint |
-| `API_KEY` | _(empty)_ | API key for the LLM provider |
-| `MODEL` | `deepseek-reasoner` | Model name to use |
-| `BRAVE_API_KEY` | _(empty)_ | Brave Search API key (optional, enables web search) |
-
-### 3. Run the Application
-
-```bash
 python -m uvicorn main:app --reload --port 8000
 ```
 
-### 4. Open in Browser
-
-Navigate to `http://localhost:8000`
-
-## Usage
-
-1. **Enter a Topic**: Type your debate topic in the sidebar (e.g., "AI 是否应该取代教师？")
-2. **Select Debaters**: Check at least 2 debaters from the list
-3. **Start Debate**: Click "开始辩论" and watch the AI debaters discuss
-4. **Participate**: Type messages and click "发送" to inject your thoughts
-5. **Judge**: Click "评判" for an impartial analysis
+Open <http://localhost:8000>.
 
 ## Configuration
 
-### Using with Other Providers
-
-| Provider | Base URL | Notes |
-|----------|----------|-------|
-| DeepSeek | `https://api.deepseek.com` | Default, requires API key |
-| Ollama | `http://localhost:11434/v1` | Local, no API key needed |
-| LM Studio | `http://localhost:1234/v1` | Start server in LM Studio |
-| vLLM | `http://localhost:8000/v1` | Run `vllm serve <model>` |
-| OpenAI | `https://api.openai.com/v1` | Requires API key |
-
-### Using with Ollama (Local Models)
-
-```bash
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull a model
-ollama pull llama3
-
-# Then set in .env:
-# API_BASE_URL=http://localhost:11434/v1
-# API_KEY=ollama
-# MODEL=llama3
-```
-
-### Web Search (Optional)
-
-To enable web search for debaters, get a Brave Search API key from [brave.com/search/api](https://brave.com/search/api/) and add it to your `.env`:
+Create `.env` at the repo root (gitignored):
 
 ```env
-BRAVE_API_KEY="your-brave-api-key"
+API_BASE_URL=https://api.deepseek.com
+API_KEY=sk-...
+MODEL=deepseek-reasoner
+BRAVE_API_KEY=BSA...   # optional; without it the web_search tool returns a graceful "not configured"
 ```
 
-## Custom Debaters
+| Variable | Default | Notes |
+|---|---|---|
+| `API_BASE_URL` | `https://api.deepseek.com` | Any OpenAI-compatible endpoint (no trailing `/v1` if the SDK adds it) |
+| `API_KEY` | _(empty)_ | Required |
+| `MODEL` | `deepseek-reasoner` | Model id sent to the upstream |
+| `BRAVE_API_KEY` | _(empty)_ | Enables the `web_search` tool |
 
-Create custom debaters in the UI:
+`.env` is loaded once at startup via Pydantic Settings; restart the server to pick up changes.
 
-1. Enter a **Name** (e.g., "实用主义者")
-2. Choose a **Color** (for message styling)
-3. Pick an **Emoji** avatar
-4. Select a **Stance**: 正方 (For), 反对 (Against), or 中立 (Neutral)
-5. Toggle **Web Search** on/off for this debater
-6. Write a **Personality** description
+### Provider examples
 
-Example personality:
-```
+| Provider | `API_BASE_URL` | `MODEL` example |
+|---|---|---|
+| DeepSeek (direct) | `https://api.deepseek.com` | `deepseek-reasoner` |
+| Volcengine Ark | `https://ark.cn-beijing.volces.com/api/v3` | endpoint id, or model name like `deepseek-v4-pro` |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o` |
+| Zhipu GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-plus` |
+| Ollama (local) | `http://localhost:11434/v1` | `qwen2.5:14b` |
+| LM Studio (local) | `http://localhost:1234/v1` | _(loaded model name)_ |
+
+All four LLM call sites — debater / judge / extractor / topic-refine — share the same config.
+
+## Using it
+
+1. Enter a topic in the sidebar (Ctrl+Enter starts immediately). The **「优化」** button asks the LLM to sharpen the topic phrasing.
+2. Pick 2+ debaters from the list. **Drag to reorder** — that's the turn order. Adjust **最大轮次** if needed.
+3. Optionally toggle **启用联网搜索** off to forbid all web search for this debate.
+4. Click **开始辩论**. Each debater streams in turn; thinking sections show the reasoning, then the response.
+5. Inject your own messages mid-debate via the input bar at the bottom.
+6. **暂停** / **继续** to pause and resume; **请裁判点评** asks for a judgment (the debate must be stopped first; auto-fires 5 s after a natural end).
+7. `Ctrl+K` opens search. **下载** exports the chat as a self-contained HTML file.
+
+## Customisation
+
+### Add a custom debater (UI)
+
+Fill the sidebar form: name, color, emoji avatar, stance (`正方` / `反方` / `中立`), and a **personality** description.
+
+The personality is treated as the **highest-priority voice/tone instruction** — it overrides the generic "be professional / back up claims" style rules. Write it like you'd direct an actor:
+
+```text
 你是"实用主义者"——一位注重实际解决方案的思考者。
 你关注成本、收益和现实世界中的可行性。
 你避免理想主义的论证，专注于真正有效的方案。
 ```
 
-## Project Structure
+A "喜欢胡说八道" debater will actually talk nonsense; the framing is strong on purpose. Structural rules (length, `[[Name]]` mentions, no headers) still apply.
 
-```
-ai_argument/
-├── main.py              # Entry point: app = create_app()
-├── app/                 # Application package
-│   ├── __init__.py      # create_app() factory (lifespan, static, routers)
-│   ├── config.py        # Pydantic Settings (from .env) + cached presets
-│   ├── deps.py          # FastAPI Depends providers + DebaterRepository
-│   ├── models.py        # Pydantic models + validation (length caps)
-│   ├── agents.py        # PydanticAI agent definitions + prompt templates
-│   ├── tools.py         # web_search tool (Brave Search, rate-limited)
-│   ├── presets.yaml     # Pre-defined debater personas (Chinese)
-│   ├── engine/
-│   │   ├── state.py     # Message / DebateState / Event dataclasses
-│   │   └── debate.py    # DebateEngine (turns, prompt building, SSE events)
-│   └── routes/
-│       ├── debate.py    # /api/debate/* (start, stream, message, judge...)
-│       ├── debaters.py  # /api/presets, /api/debaters
-│       └── topic.py     # /api/topic/refine
-├── start.sh             # Startup script (install + run)
-├── static/              # Frontend (vanilla ES modules, no build step)
-│   ├── index.html       # App shell (Chinese)
-│   ├── app.js           # DebateApp orchestrator (SSE dispatch, state machine)
-│   ├── favicon.svg
-│   ├── modules/         # ES modules
-│   │   ├── api.js       # fetch calls + error formatting
-│   │   ├── sse.js       # SSEClient (EventSource wrapper)
-│   │   ├── state.js     # UIState FSM
-│   │   ├── markdown.js  # marked config + [[Name]] mention decoration
-│   │   ├── renderer.js  # streaming bubbles, thinking section, tool cards
-│   │   ├── autoscroll.js# IntersectionObserver + floating jump button
-│   │   ├── debaters.js  # debater list render, drag reorder
-│   │   ├── search.js    # <dialog> search with highlight
-│   │   ├── theme.js     # light/dark + View Transitions API
-│   │   ├── toast.js     # capped notification stack
-│   │   └── utils.js     # escapeHtml, sanitizeColor, debounce, icon
-│   └── styles/          # cascade layers
-│       ├── main.css     # layer order + @import hub
-│       ├── tokens.css   # design tokens, dark theme
-│       ├── base.css     # reset, scrollbar, focus ring
-│       ├── layout.css   # sidebar/chat shell + responsive breakpoint
-│       ├── components.css# buttons, inputs, debater items, toasts
-│       ├── messages.css # bubbles, skeleton, cursor, concessions
-│       └── search.css   # search drawer
-├── tests/               # Backend pytest suite (100% coverage enforced)
-└── tests-js/            # Frontend node:test + jsdom suite
-└── .env                 # API configuration (not in repo)
-```
+Custom debaters live in process memory and disappear on restart.
 
-The backend uses **dependency injection** — routes receive the `DebateEngine`
-and `DebaterRepository` via FastAPI `Depends`, reading from `app.state`
-populated at startup. Configuration is validated by **Pydantic Settings**.
+### Add or edit a preset debater
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│  Browser (Single HTML page)                  │
-│  ┌─────────┐  ┌──────────────────────────┐  │
-│  │ Sidebar  │  │   Chat Area               │  │
-│  │ - Topic  │  │   Messages stream in      │  │
-│  │ - Debaters│  │   real-time via SSE       │  │
-│  │ - Settings│  │   + thinking display      │  │
-│  └─────────┘  └──────────────────────────┘  │
-└──────────────────┬──────────────────────────┘
-                   │ SSE stream + REST API
-┌──────────────────▼──────────────────────────┐
-│  FastAPI Backend                             │
-│  ┌────────────┐  ┌────────────────────────┐ │
-│  │ REST API   │  │ Debate Engine          │ │
-│  │ /api/*     │  │ - Turn management      │ │
-│  │            │  │ - PydanticAI agents    │ │
-│  └────────────┘  └────────────────────────┘ │
-│                  ┌────────────────────────┐ │
-│                  │ PydanticAI Agents       │ │
-│                  │ - Debater (w/ search)   │ │
-│                  │ - Debater (no search)   │ │
-│                  │ - Judge                 │ │
-│                  └────────────┬───────────┘ │
-│                  ┌────────────▼───────────┐ │
-│                  │ Brave Search API        │ │
-│                  │ (optional web search)   │ │
-│                  └────────────────────────┘ │
-└─────────────────────────────────────────────┘
-```
-
-### How AI-to-AI Communication Works
-
-The debate engine uses **PydanticAI Agents** for LLM calls. Each debater has its own agent instance with per-turn message history:
-
-1. The engine builds a user prompt from the debate history:
-   - Other debaters' messages are included as `[Name]: content`
-   - The debater's own messages are excluded (they're already in `message_history` as prior `ModelResponse` entries)
-2. The agent's system prompt includes date context, shared debate rules, stance instructions, personality, and optional search instructions
-3. First-turn debaters receive an opening-statement prompt instead of history
-4. A round countdown is included when `max_rounds` is set
-5. Messages stream back via SSE, including thinking/reasoning tokens and tool call events
-
-### Web Search in Debates
-
-When `enable_search` is enabled for a debater and `BRAVE_API_KEY` is configured:
-
-- **Round 1**: The debater gathers knowledge — searches the web for facts, statistics, and recent developments
-- **Round 2+**: Conservation mode — relies on gathered knowledge, with rare exception-based searches (max 1/round)
-- Search results are displayed as tool-call cards in the UI
-- A rate limiter (1 req/sec) prevents API abuse
-
-### SSE Events
-
-Event types emitted to `/api/debate/stream`:
-
-| Event | Description |
-|-------|-------------|
-| `debater_start` | A debater begins their turn |
-| `thinking_chunk` | Reasoning/thinking token stream (for models with thinking) |
-| `debater_finalize` | Transition from thinking to response |
-| `debater_chunk` | Response text token stream |
-| `debater_end` | A debater finishes their turn |
-| `tool_call` | Web search executed (with query and result summary) |
-| `round_end` | A debate round completes |
-| `debate_end` | Debate ends (max rounds reached) |
-| `debate_paused` | Debate paused by user |
-| `judge_chunk` | Judge analysis token stream |
-| `judge_result` | Judge analysis complete |
-
-### Debate Rules (enforced in prompts)
-
-- 80–200 words per response
-- Respond to actual points, not just restate position
-- Reference other debaters with `[[Name]]` syntax
-- Back up claims with reasoning or examples
-- Rebuttals must advance own argument, not just deny opponents
-- No headers, labels, or numbered sections — speak naturally
-
-## API Endpoints
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/` | Serve `static/index.html` |
-| GET | `/api/presets` | Return preset debaters |
-| GET | `/api/debaters` | Return presets + custom debaters |
-| POST | `/api/debate/start` | Start debate (2+ debaters required) |
-| GET | `/api/debate/stream` | SSE event stream |
-| POST | `/api/debate/message` | Inject user message |
-| POST | `/api/debate/stop` | Pause debate |
-| POST | `/api/debate/resume` | Resume debate |
-| POST | `/api/debate/judge` | Request judgment (debate must be stopped) |
-| POST | `/api/debaters` | Create custom debater (no duplicate names) |
-| POST | `/api/topic/refine` | AI-powered topic refinement |
-
-## Preset Debaters
-
-Defined in `presets.yaml` with Chinese names and personality descriptions:
-
-| Name | Avatar | Stance | Search | Style |
-|------|--------|--------|--------|-------|
-| 正方 | 🟢 | 正方 | Yes | Passionate advocate, cites success stories and precedents |
-| 反方 | 🔴 | 反方 | Yes | Sharp critic, finds logical flaws and weak evidence |
-| 分析家 | 🔵 | 中立 | No | Data-driven, weighs multiple perspectives, spots false dichotomies |
-
-### Adding a New Preset Debater
-
-Edit `presets.yaml`:
+Edit `app/presets.yaml`:
 
 ```yaml
 debaters:
@@ -287,33 +99,127 @@ debaters:
     color: "#9b59b6"
     avatar: "🟣"
     stance: "中立"
-    enable_search: true
+    enable_search: true        # default true; set false to forbid web_search for this persona
     personality: |
       你是"实用主义者"——一位注重实际解决方案的思考者。
       你关注成本、收益和现实世界中的可行性。
 ```
 
-## Running Tests
+Loaded once at startup via `@lru_cache`. Restart to pick up changes — no migration needed.
 
-```bash
-# Backend tests (100% coverage enforced via pyproject.toml)
-python -m pytest tests/ -v
-python -m pytest tests/test_debate_engine.py -v          # one file
-python -m pytest tests/ --cov=app --cov-report=term-missing
+### Edit the prompt templates
 
-# Frontend tests (node:test + jsdom)
-npm test                                                  # all
-node --test tests-js/renderer.test.js                     # one file
+The seven prompt templates live in `prompts/*.md` and are loaded at import:
+
+| File | Used for |
+|---|---|
+| `debate_rules.md` | Shared rules every debater sees |
+| `search_instructions.md` | The two-phase web-search strategy |
+| `strategy_instructions.md` | Round-2+ adaptive counter-strategy |
+| `memory_instructions.md` | Cross-round citation patterns |
+| `judge.md` | Judge persona |
+| `extract_points.md` | Key-claim extractor (JSON out) |
+| `topic_refine.md` | Topic-optimisation persona |
+
+Change the wording in the markdown file, restart, done. No Python touched, no tests re-run.
+
+The single piece still inline in `app/agents.py` is the **personality framing wrapper** around `debater.personality` (it's logic, not content — wraps the user's persona text with the override clause).
+
+## Architecture
+
+```
+ai_argument/
+├── main.py                      # thin: app = create_app()
+├── app/
+│   ├── __init__.py              # create_app(): lifespan, static mount, routers
+│   ├── config.py                # Pydantic Settings (.env) + cached load_presets()
+│   ├── deps.py                  # FastAPI Depends + DebaterRepository
+│   ├── models.py                # API models + Stance literals + length caps
+│   ├── agents.py                # PydanticAI agent factories + _load_prompt(prompts/*.md)
+│   ├── tools.py                 # web_search tool (Brave, 1 req/sec, graceful errors)
+│   ├── presets.yaml             # preset debaters (3 Chinese personas)
+│   ├── engine/
+│   │   ├── state.py             # Message / DebateState / Event dataclasses
+│   │   ├── prompt.py            # pure build_user_prompt(state, debater)
+│   │   ├── event_bus.py         # SSE event queue + 500-event replay buffer
+│   │   └── debate.py            # DebateEngine: turn loop, SSE, AgentBundle injection
+│   └── routes/                  # debate / debaters / topic
+├── prompts/                     # *.md prompt templates — edit here, not Python
+├── static/
+│   ├── index.html, app.js       # SPA shell + orchestrator
+│   ├── modules/
+│   │   ├── renderer.js          # streaming state machine (rAF-batched markdown)
+│   │   ├── bubble.js            # pure DOM factories (debater / thinking / tool-card / system / user)
+│   │   ├── store.js             # MessageStore — canonical record of finalised messages
+│   │   ├── markdown.js          # marked config + [[Name]] mention rendering
+│   │   ├── search.js            # <dialog> search, reads MessageStore
+│   │   ├── sse.js, autoscroll.js, debaters.js, theme.js, toast.js, utils.js
+│   ├── styles/                  # cascade-layer CSS (tokens / base / layout / components / messages / search)
+│   └── vendor/                  # marked@12.0.2 + lucide@0.469.0 — pinned, local copies
+├── tests/                       # backend pytest, 100% coverage enforced (--cov-fail-under=100)
+├── tests-js/                    # frontend unit (node --test + jsdom)
+└── tests-e2e/                   # Playwright integration smoke
 ```
 
-Backend tests use `pytest` with `pytest-asyncio` (auto mode) and `pytest-cov`.
-Frontend tests use the built-in Node test runner with `jsdom` — no build step.
+**Backend** is FastAPI + PydanticAI Agents end-to-end. Single-user, in-memory; state lives on `app.state.engine` populated during lifespan. The debate engine streams via Server-Sent Events.
 
-## Limitations
+**Frontend** is vanilla ES modules — no bundler, no framework. `marked` and `lucide` are vendored under `static/vendor/` to avoid CDN latency.
 
-- **Single User**: Designed as a personal tool (not multi-user)
-- **No Persistence**: Debate state is in-memory only
-- **Session-Only Custom Debaters**: Custom debaters don't persist across restarts
+### SSE event types
+
+`debater_start`, `thinking_chunk`, `debater_finalize`, `debater_chunk`, `debater_end`, `tool_call`, `round_end`, `debate_end`, `debate_paused`, `judge_chunk`, `judge_result`, plus terminal `debate_error` / `judge_error`.
+
+The stream supports `Last-Event-ID` reconnect (500-event replay buffer). One consumer per debate — a second concurrent `/api/debate/stream` returns 409.
+
+### Web search
+
+`web_search` is a PydanticAI tool registered on the search-enabled debater agent. The prompt enforces:
+
+- **Round 1**: search actively, summarise findings, declare readiness — no opening argument yet.
+- **Round 2+**: tool is allowed at most once per round and only for surprising, verifiable claims.
+
+A 1 req/sec rate limiter throttles Brave. Any failure (5xx, 429, HTML interstitial, malformed JSON) returns a graceful string the LLM keeps reading from — the debate never crashes on a search outage.
+
+## API
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/` | Serve `static/index.html` |
+| GET | `/api/presets` | Preset debaters |
+| GET | `/api/debaters` | Presets + custom debaters |
+| POST | `/api/debaters` | Create a custom debater (name must be unique) |
+| POST | `/api/debate/start` | Start a debate (2+ debaters; `search_enabled` toggle) |
+| GET | `/api/debate/stream` | SSE event stream (single-consumer; supports `Last-Event-ID`) |
+| POST | `/api/debate/message` | Inject a user message into the live debate |
+| POST | `/api/debate/stop` | Pause the running debate |
+| POST | `/api/debate/resume` | Resume a paused debate |
+| POST | `/api/debate/judge` | Request a judgment (debate must be stopped) |
+| POST | `/api/topic/refine` | LLM-optimise a topic phrasing |
+
+## Tests
+
+Three independent suites, no shared runner:
+
+```bash
+# 1. backend (100% coverage gate)
+.venv/bin/python -m pytest tests/
+
+# 2. frontend unit (jsdom + node:test, no build)
+npm test
+
+# 3. frontend e2e (Playwright)
+npx playwright install chromium     # once
+npm run test:e2e
+```
+
+For details on the non-obvious testing patterns (AgentBundle injection, jsdom env stubs, the inline-marked-stub convention, real-marked e2e), see `AGENTS.md`.
+
+## Known limits
+
+- **Single user, no persistence** — restart the server and the debate is gone. By design.
+- **No upstream LLM timeout** — if the model hangs, the debate stalls behind SSE keepalives. A per-turn `asyncio.timeout` is on the to-do list.
+- **`_downloadChat` still reads DOM** rather than the new `MessageStore`. Migration deferred until there's test coverage for the export.
+- **No mobile/touch** support for the drag-to-reorder debater list (desktop HTML5 DnD only).
 
 ## License
 
