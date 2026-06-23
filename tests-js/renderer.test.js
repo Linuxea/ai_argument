@@ -49,12 +49,15 @@ test('B19: finalize with thinking but no body keeps the bubble (thinking has con
     const bubbles = messages.querySelectorAll('.message');
     assert.equal(bubbles.length, 1,
         'finalize() with non-empty thinking must keep the bubble visible');
-    // Thinking section should be collapsed.
     const thinkingSection = bubbles[0].querySelector('.thinking-section');
     assert.ok(thinkingSection, 'thinking section should still be present');
     const text = thinkingSection.querySelector('.thinking-text');
-    assert.ok(text.classList.contains('thinking-collapsed'),
-        'finalize() should collapse the thinking section');
+    // Thinking now stays expanded by default (user can still collapse manually).
+    assert.ok(!text.classList.contains('thinking-collapsed'),
+        'finalize() should leave the thinking section expanded by default');
+    const header = thinkingSection.querySelector('.thinking-header');
+    assert.equal(header.getAttribute('aria-expanded'), 'true',
+        'thinking header should report expanded after finalize');
 });
 
 test('B19: finalize with normal content keeps the bubble', () => {
@@ -147,4 +150,43 @@ test('B21: a new debater turn counts as 1 new message (not 1 per chunk)', () => 
             `startDebaterTurn should produce exactly 1 counted schedule (got ${countedCalls})`);
         resolve();
     }, 20));
+});
+
+test('F2: each debater bubble carries its own --bubble-color for tinting', () => {
+    const { renderer, messages } = makeRenderer();
+    renderer.startDebaterTurn({ name: '正方', color: '#2ecc71', avatar: '🟢' });
+    renderer.appendChunk('hi');
+    renderer.finalize();
+    renderer.startDebaterTurn({ name: '反方', color: '#e74c3c', avatar: '🔴' });
+    renderer.appendChunk('hey');
+    renderer.finalize();
+
+    const bubbles = messages.querySelectorAll('.message.ai');
+    assert.equal(bubbles.length, 2);
+    assert.equal(bubbles[0].style.getPropertyValue('--bubble-color'), '#2ecc71');
+    assert.equal(bubbles[1].style.getPropertyValue('--bubble-color'), '#e74c3c');
+});
+
+test('F2: tool-card bubbles also carry the current debater --bubble-color', () => {
+    const { renderer, messages } = makeRenderer();
+    renderer.startDebaterTurn({ name: '正方', color: '#2ecc71', avatar: '🟢' });
+    renderer.addToolCard({ debaterName: '正方', query: 'q', resultSummary: 's' });
+    const card = messages.querySelector('.message.ai.tool-card');
+    assert.ok(card, 'tool card should be rendered');
+    assert.equal(card.style.getPropertyValue('--bubble-color'), '#2ecc71');
+});
+
+test('F3: tool-card results are expanded by default (not collapsed)', () => {
+    const { renderer, messages } = makeRenderer();
+    renderer.startDebaterTurn({ name: 'A', color: '#000', avatar: '💬' });
+    renderer.addToolCard({ debaterName: 'A', query: 'q', resultSummary: 's' });
+    const results = messages.querySelector('.tool-card-results');
+    assert.ok(results, 'tool-card results element should exist');
+    assert.ok(!results.classList.contains('tool-card-collapsed'),
+        'tool-card results should start expanded');
+    const label = messages.querySelector('.tool-card-label');
+    assert.equal(label.getAttribute('aria-expanded'), 'true',
+        'tool-card label should report expanded initially');
+    const toggle = messages.querySelector('.tool-card-toggle');
+    assert.equal(toggle.textContent, '▼');
 });

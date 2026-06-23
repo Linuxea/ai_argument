@@ -11,11 +11,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles/main.css?v=22">
-    <!-- Pin CDN deps to specific versions to avoid silent breaking changes.
-         TODO: regenerate SRI hashes with `openssl dgst -sha384 -binary <file> | openssl base64 -A`
-         and add integrity="..." attributes once we're on a network with registry access. -->
-    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" defer></script>
-    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+    <!-- Vendor deps served locally (static/vendor/) to avoid CDN latency/blocking.
+         Pinned versions; bump the ?v= query when updating a file. -->
+    <script src="/static/vendor/marked.min.js?v=12.0.2" defer></script>
+    <script src="/static/vendor/lucide.min.js?v=0.469.0" defer></script>
 </head>
 <body>
     <div class="app" id="app">
@@ -40,6 +39,10 @@
                         <span>优化</span>
                     </button>
                 </div>
+                <label class="option-line" for="search-enabled" title="关闭后全场禁用联网搜索；原本就不搜索的辩手不受影响">
+                    <input type="checkbox" id="search-enabled" checked>
+                    <span>启用联网搜索</span>
+                </label>
             </section>
 
             <section class="sidebar-section" aria-labelledby="debaters-label">

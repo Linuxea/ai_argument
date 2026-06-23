@@ -70,11 +70,17 @@ test('B20: concession tag at start of message handled', () => {
     assert.match(html, /Fair point/);
 });
 
-test('mentions inside concession both render', () => {
+test('mentions inside concession render as real spans (not escaped tag text)', () => {
     const html = renderMarkdown('[退让]as [[Alice]] said[/退让]');
     assert.match(html, /concession/);
-    assert.match(html, /mention/);
-    assert.match(html, /Alice/);
+    // Must render a real mention span, not escaped tag text. The naive
+    // /mention/ check passes even on `&lt;span class="mention"&gt;`, which is
+    // the regression: a concession sub-parse used to run the mention <span>
+    // back through marked, which escaped it.
+    assert.match(html, /<span class="mention">Alice<\/span>/,
+        `mention inside concession was not rendered as a real span:\n${html}`);
+    assert.ok(!html.includes('&lt;span class="mention"'),
+        `mention tag leaked as literal escaped text:\n${html}`);
 });
 
 test('falsy input returns empty string', () => {

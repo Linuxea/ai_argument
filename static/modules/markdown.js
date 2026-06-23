@@ -96,21 +96,15 @@ export function renderMarkdown(raw) {
 
         let html = window.marked.parse(sanitized);
 
-        html = html.replace(/\u0000MENTION_(\d+)\u0000/g, (_, i) => {
-            const name = mentions[parseInt(i, 10)] ?? '';
-            return `<span class="mention">${escapeHtml(name)}</span>`;
-        });
-
+        // Expand concessions BEFORE mentions. The concession text still holds
+        // mention placeholders (\u0000MENTION_N\u0000), which marked treats as
+        // opaque text — so they pass through the sub-parse untouched instead
+        // of being escaped by the renderer.html override (which is what
+        // happened when we pre-expanded them into <span>s here: the second
+        // marked.parse escaped those spans and leaked literal tag text).
         html = html.replace(/\u0000CONCESSION_(\d+)\u0000/g, (_, i) => {
             const text = concessions[parseInt(i, 10)] ?? '';
-            // The concession's own content may contain mention placeholders;
-            // expand them first so the inner markdown pass sees the final
-            // text and doesn't mangle them as link references.
-            const expanded = text.replace(/\u0000MENTION_(\d+)\u0000/g, (_m, j) => {
-                const name = mentions[parseInt(j, 10)] ?? '';
-                return `<span class="mention">${escapeHtml(name)}</span>`;
-            });
-            const inner = window.marked.parse(expanded);
+            const inner = window.marked.parse(text);
             // If marked produced a single <p>…</p> with no nested block tags,
             // render inline as <span>; otherwise wrap as a block <div> so
             // the resulting HTML stays valid (spans cannot contain blocks).
@@ -121,6 +115,13 @@ export function renderMarkdown(raw) {
                 return `<span class="concession">${single[1]}</span>`;
             }
             return `<div class="concession concession-block">${inner}</div>`;
+        });
+
+        // Expand mention placeholders only after every marked.parse is done,
+        // so nothing downstream re-escapes the resulting <span>s.
+        html = html.replace(/\u0000MENTION_(\d+)\u0000/g, (_, i) => {
+            const name = mentions[parseInt(i, 10)] ?? '';
+            return `<span class="mention">${escapeHtml(name)}</span>`;
         });
 
         return _sanitizeHtml(html);

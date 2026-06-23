@@ -12,6 +12,7 @@ import { DebaterList } from './modules/debaters.js';
 import { SearchPanel } from './modules/search.js';
 
 const STORAGE_MAX_ROUNDS = 'max_rounds';
+const STORAGE_SEARCH_ENABLED = 'search_enabled';
 
 class DebateApp {
     constructor() {
@@ -52,6 +53,11 @@ class DebateApp {
         }
         this.maxRounds = this._readMaxRounds();
 
+        // Search toggle: default on. Stored as '0' when explicitly disabled.
+        if (localStorage.getItem(STORAGE_SEARCH_ENABLED) === '0') {
+            this.searchEnabledInput.checked = false;
+        }
+
         await this._loadDebaters();
         this._applyUIState('idle');
         this.renderer.showEmptyState({ onSuggest: (s) => this._useSuggestion(s) });
@@ -62,6 +68,7 @@ class DebateApp {
         // Sidebar
         this.topicInput = document.getElementById('topic-input');
         this.maxRoundsInput = document.getElementById('max-rounds');
+        this.searchEnabledInput = document.getElementById('search-enabled');
         this.refineTopicBtn = document.getElementById('refine-topic-btn');
         this.debaterListEl = document.getElementById('debater-list');
         this.startBtn = document.getElementById('start-btn');
@@ -135,6 +142,11 @@ class DebateApp {
                 localStorage.setItem(STORAGE_MAX_ROUNDS, String(v));
                 this.maxRounds = v;
             }
+        });
+
+        // Persist search toggle
+        this.searchEnabledInput.addEventListener('change', () => {
+            localStorage.setItem(STORAGE_SEARCH_ENABLED, this.searchEnabledInput.checked ? '1' : '0');
         });
 
         // Global keybinds
@@ -223,7 +235,12 @@ class DebateApp {
         this._autoJudgeToastEl = toast.info('评委将在 5 秒后开始点评 — 点击「请裁判点评」立即开始', { duration: 0 });
         this._autoJudgeTimer = setTimeout(() => {
             this._autoJudgeTimer = null;
-            this._autoJudgeToastEl = null;
+            // Dismiss the countdown toast when the delay elapses — it was
+            // shown with duration:0 so it would otherwise linger forever.
+            if (this._autoJudgeToastEl) {
+                toast.dismiss(this._autoJudgeToastEl);
+                this._autoJudgeToastEl = null;
+            }
             // Sanity check the state in case it changed during the delay.
             if (this.state.is('stopped')) this._requestJudge();
         }, 5000);
@@ -261,6 +278,7 @@ class DebateApp {
                 topic,
                 debater_names: selectedOrdered,
                 max_rounds: maxRounds,
+                search_enabled: this.searchEnabledInput.checked,
             });
 
             this.state.set('debating');

@@ -127,6 +127,36 @@ def test_start_debate_with_max_rounds(fake_engine, client):
     assert fake_engine.start_called[2] == 3
 
 
+def test_start_debate_search_disabled_forces_all_off(fake_engine, client):
+    # The global kill-switch must force every debater's enable_search off,
+    # even those whose preset defaults to True (正方/反方 here).
+    resp = client.post(
+        "/api/debate/start",
+        json={"topic": "T", "debater_names": ["正方", "反方"], "search_enabled": False},
+    )
+    assert resp.status_code == 200
+    _, debaters, _ = fake_engine.start_called
+    assert [d.name for d in debaters] == ["正方", "反方"]
+    assert all(d.enable_search is False for d in debaters)
+
+
+def test_start_debate_search_enabled_leaves_preset_untouched(fake_engine, client, fresh_repository):
+    # 正方 defaults to enable_search=True; 分析家 preset explicitly disables it.
+    # With search_enabled=True (the default), each debater keeps its own setting
+    # — the flag never grants search to a no-search debater. ``fresh_repository``
+    # isolates us from custom-debater pollution; presets still come from the
+    # global ``load_presets()`` (presets.yaml).
+    resp = client.post(
+        "/api/debate/start",
+        json={"topic": "T", "debater_names": ["正方", "分析家"]},
+    )
+    assert resp.status_code == 200
+    _, debaters, _ = fake_engine.start_called
+    by_name = {d.name: d for d in debaters}
+    assert by_name["正方"].enable_search is True
+    assert by_name["分析家"].enable_search is False
+
+
 def test_start_debate_min_debaters(fake_engine, client):
     resp = client.post(
         "/api/debate/start",

@@ -11,6 +11,7 @@ setupDom();
 document.body.innerHTML = `
     <input id="topic-input" type="text">
     <input id="max-rounds" type="number" min="1" max="50" value="10">
+    <input type="checkbox" id="search-enabled" checked>
     <button id="refine-topic-btn"></button>
     <div id="debater-list"></div>
     <button id="start-btn"></button>

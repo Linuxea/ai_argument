@@ -247,7 +247,25 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
     parts.extend(
         [
             f"Your stance: {stance}",
-            debater.personality,
+            # Frame the personality as the authoritative voice/tone persona.
+            # Without this framing it was just raw text appended to the prompt,
+            # so the generic "be professional / back up claims / no bare
+            # assertions" rules above easily overrode playful or contrarian
+            # characters (e.g. a "talks nonsense" debater staying earnest).
+            # Voice/tone guidance is now subordinate to the character;
+            # structural rules (length, [[Name]] mentions, no headers) remain.
+            (
+                "## Your Character (HIGHEST priority for voice and tone)\n"
+                "Below is your character description. You MUST stay fully in character "
+                "at all times — it defines your personality, tone, vocabulary, humor, "
+                "and rhetorical style. This OVERRIDES the general style guidance above "
+                '(e.g. "professional", "back up claims with reasoning", "no bare '
+                'assertions", "respectful") whenever they conflict: your character\'s '
+                "voice always wins. Structural rules still apply: keep responses "
+                "80-200 words, use [[Name]] mentions to refer to others, no headers "
+                "or section labels.\n\n"
+                f"{debater.personality}"
+            ),
         ]
     )
 

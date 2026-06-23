@@ -71,6 +71,13 @@ async def start_debate(
     if len(selected) != len(config.debater_names):
         raise HTTPException(status_code=400, detail="Invalid debater name")
 
+    # Global search kill-switch: disabling search for the debate forces every
+    # selected debater's ``enable_search`` off. Copies are used so the shared
+    # repository objects are never mutated, and a debater whose preset already
+    # disables search is simply left as-is (the flag never grants search).
+    if not config.search_enabled:
+        selected = [d.model_copy(update={"enable_search": False}) for d in selected]
+
     try:
         engine.start(config.topic, selected, config.max_rounds)
     except RuntimeError as exc:

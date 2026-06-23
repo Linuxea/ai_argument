@@ -46,6 +46,11 @@ class DebateConfig(BaseModel):
     topic: str = Field(max_length=MAX_TOPIC_LENGTH)
     debater_names: list[str] = Field(min_length=2, max_length=MAX_DEBATERS)
     max_rounds: int | None = Field(default=None, ge=1, le=MAX_ROUNDS)
+    # Global search kill-switch for the whole debate. When False, every
+    # selected debater is forced to ``enable_search=False``. When True, each
+    # debater keeps its own preset/custom ``enable_search`` — so a debater
+    # that can't search (e.g. 分析家) is never given search by this flag.
+    search_enabled: bool = True
 
     @field_validator("debater_names")
     @classmethod

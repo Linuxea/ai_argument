@@ -268,6 +268,24 @@
         width: 72px;
     }
 
+    .option-line {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-top: var(--space-2);
+        font-size: var(--text-sm);
+        color: var(--ink-soft);
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .option-line input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--gold);
+        cursor: pointer;
+    }
+
     /* ─── Debater list ────────────────────────────── */
 
     .debater-list {
@@ -443,10 +461,17 @@
     }
 
     .tool-card-results-inner {
-        padding: var(--space-2) var(--space-3);
+        padding: 0 var(--space-3);
         background: var(--bg-input);
         border-radius: var(--radius-xs);
         margin-top: var(--space-1);
+    }
+
+    .tool-card-results-inner > :first-child { padding-top: var(--space-2); }
+    .tool-card-results-inner > :last-child { padding-bottom: var(--space-2); }
+
+    .tool-card .tool-card-results.tool-card-collapsed .tool-card-results-inner {
+        margin-top: 0;
     }
 
     .tool-card-results-inner p { margin: 0; }

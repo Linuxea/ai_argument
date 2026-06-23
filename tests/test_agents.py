@@ -49,6 +49,11 @@ def test_build_debater_instructions_contains_rules():
     assert "multi-party debate" in instructions
     assert "You are a test debater." in instructions
     assert "balanced view" in instructions
+    # Personality is framed as the authoritative voice/tone persona so that
+    # a playful/contrarian character isn't overruled by generic "be
+    # professional" rules.
+    assert "HIGHEST priority" in instructions
+    assert "in character" in instructions
 
 
 def test_build_debater_instructions_with_for_stance():

@@ -100,6 +100,15 @@
         box-shadow: var(--shadow-lg);
     }
 
+    /* AI debater bubbles carry a faint tint of that debater's color for
+       at-a-glance distinction. ``--bubble-color`` is set per-message by the
+       renderer. color-mix degrades gracefully: if unsupported, the
+       declaration is dropped and the base ``--bg-elevated`` shows through. */
+    .message.ai .message-content,
+    .message.ai .tool-card-content {
+        background: color-mix(in srgb, var(--bubble-color, var(--bg-elevated)) 8%, var(--bg-elevated));
+    }
+
     .message-content > *:first-child { margin-top: 0; }
     .message-content > *:last-child  { margin-bottom: 0; }
 

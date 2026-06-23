@@ -89,6 +89,7 @@ export class MessageRenderer {
         const isConsecutive = (this._lastSpeakerName === debater.name && this._lastSpeakerType === 'debater');
         message.className = isConsecutive ? 'message ai continuation' : 'message ai';
         message.dataset.speaker = debater.name;
+        message.style.setProperty('--bubble-color', sanitizeColor(debater.color));
 
         const header = document.createElement('div');
         header.className = 'message-header';
@@ -212,7 +213,7 @@ export class MessageRenderer {
             // Click & keyboard toggle
             const toggleFn = () => {
                 const collapsed = text.classList.toggle('thinking-collapsed');
-                toggle.style.transform = collapsed ? '' : 'rotate(0deg)';
+                toggle.textContent = collapsed ? '▶' : '▼';
                 header.setAttribute('aria-expanded', String(!collapsed));
             };
             header.addEventListener('click', toggleFn);
@@ -265,14 +266,14 @@ export class MessageRenderer {
             const inner = this.currentThinkingEl.querySelector('.thinking-text-inner');
             thinkingHasContent = !!(inner?.dataset.raw || '').trim();
             if (thinkingHasContent) {
-                const text = this.currentThinkingEl.querySelector('.thinking-text');
                 const toggle = this.currentThinkingEl.querySelector('.thinking-toggle');
                 const label = this.currentThinkingEl.querySelector('.thinking-label');
                 const header = this.currentThinkingEl.querySelector('.thinking-header');
-                text.classList.add('thinking-collapsed');
-                toggle.textContent = '▶';
+                // Keep the thinking section expanded by default; the user can
+                // still collapse it via the header toggle above.
+                toggle.textContent = '▼';
                 label.textContent = '思考过程';
-                header?.setAttribute('aria-expanded', 'false');
+                header?.setAttribute('aria-expanded', 'true');
             } else {
                 this.currentThinkingEl.remove();
                 this.currentThinkingEl = null;
@@ -367,6 +368,7 @@ export class MessageRenderer {
         const isConsecutive = (this._lastSpeakerName === debaterName && this._lastSpeakerType === 'debater');
         message.className = isConsecutive ? 'message ai tool-card continuation' : 'message ai tool-card';
         message.dataset.speaker = debaterName;
+        message.style.setProperty('--bubble-color', sanitizeColor(this.currentDebater?.color || '#333333'));
 
         const header = document.createElement('div');
         header.className = 'message-header';
@@ -396,11 +398,11 @@ export class MessageRenderer {
         label.className = 'tool-card-label';
         label.setAttribute('role', 'button');
         label.setAttribute('tabindex', '0');
-        label.setAttribute('aria-expanded', 'false');
+        label.setAttribute('aria-expanded', 'true');
 
         const toggle = document.createElement('span');
         toggle.className = 'tool-card-toggle';
-        toggle.textContent = '▶';
+        toggle.textContent = '▼';
 
         const labelText = document.createElement('span');
         labelText.textContent = '检索: ';
@@ -413,7 +415,7 @@ export class MessageRenderer {
         label.append(toggle, searchIcon, labelText, querySpan);
 
         const results = document.createElement('div');
-        results.className = 'tool-card-results tool-card-collapsed';
+        results.className = 'tool-card-results';
 
         const inner = document.createElement('div');
         inner.className = 'tool-card-results-inner';
