@@ -189,29 +189,6 @@
         margin: 0 8px;
     }
 
-    /* Concession — tactical retreat, fading ink */
-    .concession {
-        display: inline;
-        background: rgba(43, 38, 32, 0.05);
-        border-left: 2px dashed var(--ink-muted);
-        padding: 1px 6px 1px 8px;
-        border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
-        font-style: italic;
-        color: var(--ink-soft);
-    }
-
-    .concession.concession-block {
-        display: block;
-        padding: 6px 12px;
-        margin: 8px 0;
-    }
-
-    .concession::before {
-        content: '🤝 ';
-        font-size: 0.85em;
-        opacity: 0.7;
-    }
-
     /* Judge — sage accent. Specificity (0,3,0) already beats the default
        .message-content border-left-color at (0,1,0), so no !important. */
     .message.judge .message-content {

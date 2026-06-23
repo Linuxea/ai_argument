@@ -114,21 +114,6 @@ Be concise. Cite actual arguments from the debate. Do not let your own opinions 
 topic influence your judgment.\
 """
 
-CONCESSION_INSTRUCTIONS = """\
-## Strategic Concession
-
-A skilled debater knows when to yield ground to gain credibility:
-
-- When an opponent makes a valid point on a **non-core** issue, acknowledge it honestly using the markup: \
-[退让]your acknowledgement here[/退让]
-- After conceding, immediately **reframe** the issue or pivot to a stronger argument — never concede without \
-following up with a stronger position
-- Never concede your **core** position — only peripheral or secondary points
-- Use concessions strategically: they build trust and make your strongest arguments more credible
-- A good concession sounds like: "You raise a fair point about X, but that actually reinforces my argument \
-because Y"
-"""
-
 STRATEGY_INSTRUCTIONS = """\
 ## Dynamic Strategy
 
@@ -240,7 +225,6 @@ def _build_debater_instructions(ctx: RunContext[DebaterDeps]) -> str:
     ]
 
     if ctx.deps.round_number >= 1:
-        parts.append(CONCESSION_INSTRUCTIONS)
         parts.append(STRATEGY_INSTRUCTIONS)
         parts.append(MEMORY_INSTRUCTIONS)
 

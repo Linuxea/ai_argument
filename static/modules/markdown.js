@@ -1,4 +1,4 @@
-// markdown.js — configure marked, render with mentions/concession decoration
+// markdown.js — configure marked, render with mention decoration
 //
 // Safety contract:
 //   1. Raw HTML tokens are escaped (renderer.html override).
@@ -65,7 +65,7 @@ function _sanitizeHtml(html) {
 configureMarked();
 
 /**
- * Render markdown with custom mention/concession decoration.
+ * Render markdown with custom mention decoration.
  * Safe against raw HTML injection via the renderer.html override plus
  * a DOM-based sanitiser pass that strips on* handlers and dangerous URLs.
  * Falls back to plain-text rendering if marked is unavailable.
@@ -79,46 +79,18 @@ export function renderMarkdown(raw) {
     }
 
     try {
-        // Protect [[Name]] mentions from marked's link-ref handling, and
-        // detect [退让]...[/退让] blocks before markdown processing so we can
-        // decide whether to wrap them inline (single-line) or as a block
-        // (multi-paragraph) — span/p nesting violates HTML.
+        // Protect [[Name]] mentions from marked's link-ref handling before
+        // markdown processing.
         const mentions = [];
-        const concessions = [];
-        let sanitized = String(raw).replace(/\[\[([^\]]+)\]\]/g, (_, name) => {
+        const sanitized = String(raw).replace(/\[\[([^\]]+)\]\]/g, (_, name) => {
             mentions.push(name);
             return `\u0000MENTION_${mentions.length - 1}\u0000`;
-        });
-        sanitized = sanitized.replace(/\[退让\]([\s\S]*?)\[\/退让\]/g, (_, text) => {
-            concessions.push(text);
-            return `\u0000CONCESSION_${concessions.length - 1}\u0000`;
         });
 
         let html = window.marked.parse(sanitized);
 
-        // Expand concessions BEFORE mentions. The concession text still holds
-        // mention placeholders (\u0000MENTION_N\u0000), which marked treats as
-        // opaque text — so they pass through the sub-parse untouched instead
-        // of being escaped by the renderer.html override (which is what
-        // happened when we pre-expanded them into <span>s here: the second
-        // marked.parse escaped those spans and leaked literal tag text).
-        html = html.replace(/\u0000CONCESSION_(\d+)\u0000/g, (_, i) => {
-            const text = concessions[parseInt(i, 10)] ?? '';
-            const inner = window.marked.parse(text);
-            // If marked produced a single <p>…</p> with no nested block tags,
-            // render inline as <span>; otherwise wrap as a block <div> so
-            // the resulting HTML stays valid (spans cannot contain blocks).
-            const blockTagRe = /<(p|div|ul|ol|li|h\d|blockquote|pre|table|hr)\b/i;
-            const trimmed = inner.trim();
-            const single = trimmed.match(/^<p>([\s\S]*)<\/p>$/);
-            if (single && !blockTagRe.test(single[1])) {
-                return `<span class="concession">${single[1]}</span>`;
-            }
-            return `<div class="concession concession-block">${inner}</div>`;
-        });
-
-        // Expand mention placeholders only after every marked.parse is done,
-        // so nothing downstream re-escapes the resulting <span>s.
+        // Expand mention placeholders after marked is done so nothing
+        // re-escapes the resulting <span>s.
         html = html.replace(/\u0000MENTION_(\d+)\u0000/g, (_, i) => {
             const name = mentions[parseInt(i, 10)] ?? '';
             return `<span class="mention">${escapeHtml(name)}</span>`;

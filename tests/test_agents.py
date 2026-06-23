@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 from pydantic_ai.models import Model
 
 from app.agents import (
-    CONCESSION_INSTRUCTIONS,
     EXTRACT_POINTS_PROMPT,
     MEMORY_INSTRUCTIONS,
     STRATEGY_INSTRUCTIONS,
@@ -195,12 +194,6 @@ def test_judge_agent_disables_thinking_via_extra_body():
     assert settings["extra_body"]["thinking"]["type"] == "disabled"
 
 
-def test_concession_instructions_exists():
-    assert isinstance(CONCESSION_INSTRUCTIONS, str)
-    assert len(CONCESSION_INSTRUCTIONS) > 50
-    assert "退让" in CONCESSION_INSTRUCTIONS
-
-
 def test_strategy_instructions_exists():
     assert isinstance(STRATEGY_INSTRUCTIONS, str)
     assert len(STRATEGY_INSTRUCTIONS) > 50
@@ -217,22 +210,6 @@ def test_extract_points_prompt_exists():
     assert isinstance(EXTRACT_POINTS_PROMPT, str)
     assert "points" in EXTRACT_POINTS_PROMPT.lower()
     assert "json" in EXTRACT_POINTS_PROMPT.lower()
-
-
-def test_build_debater_instructions_includes_concession_for_round_2():
-    debater = Debater(name="Test", stance="正方", personality="Test.")
-    ctx = MagicMock()
-    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=1, max_rounds=3)
-    instructions = _build_debater_instructions(ctx)
-    assert "退让" in instructions
-
-
-def test_build_debater_instructions_excludes_concession_for_round_0():
-    debater = Debater(name="Test", stance="正方", personality="Test.")
-    ctx = MagicMock()
-    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=0, max_rounds=3)
-    instructions = _build_debater_instructions(ctx)
-    assert "退让" not in instructions
 
 
 def test_build_debater_instructions_includes_strategy_for_round_2():
