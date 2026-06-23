@@ -32,7 +32,7 @@ The LLM layer uses **PydanticAI Agents** (not raw OpenAI SDK, except `app/routes
 - **`create_judge_agent()`** — judge agent, no tools, no thinking
 - **`create_extractor_agent()`** — lightweight agent extracting key claims per turn (for cross-round memory)
 
-Each agent uses `DebaterDeps` for dependency injection (topic, debater config, round number, Brave API key). The `instructions` callback (`_build_debater_instructions`) rebuilds the system prompt fresh on every run, composing: date context → `DEBATE_RULES` → stance instruction → personality → `SEARCH_INSTRUCTIONS` (if search enabled) → round countdown.
+Each agent uses `DebaterDeps` for dependency injection (topic, debater config, round number, Brave API key). The `instructions` callback (`_build_debater_instructions`) rebuilds the system prompt fresh on every run, composing: date context → `DEBATE_RULES` → (round ≥ 1: `STRATEGY_INSTRUCTIONS` + `MEMORY_INSTRUCTIONS`) → stance → personality → `SEARCH_INSTRUCTIONS` (if search enabled) → round countdown. **Personality is framed as HIGHEST-priority voice/tone** and explicitly overrides the generic "be professional / back up claims" style rules in `DEBATE_RULES` — without this framing, playful/contrarian characters get suppressed. Don't "tidy" that framing away.
 
 ### Core Algorithm: Prompt Building
 
@@ -66,6 +66,8 @@ The SSE stream calls `ensure_loop_running()` **after** the consumer connects. St
 
 `app/tools.py` provides a `web_search` function (Brave Search API) with a 1 req/sec rate limiter (`_RateLimiter`). It's registered as a PydanticAI tool on the search-enabled debater agent. The `SEARCH_INSTRUCTIONS` in `app/agents.py` enforce a two-phase strategy: Round 1 is knowledge gathering (multiple searches), Round 2+ is conservation mode (max 1 search/round, only for verifiable claims).
 
+**Per-debater `enable_search`** lives on `Debater` (default True; presets can disable, e.g. 分析家). The start route (`/api/debate/start`) also takes a global **`DebateConfig.search_enabled` kill-switch** (default True): when False it `model_copy`s every selected debater to `enable_search=False`. **Kill-switch semantics: it only disables — turning it ON never grants search to a debater whose preset disables it.** Don't "fix" this into a hard override.
+
 ### Global State
 
 Application state lives on `app.state` (FastAPI's standard `State`), populated during lifespan in `create_app()`: `engine` (`DebateEngine`), `debater_repository` (`DebaterRepository`, in-memory custom debaters behind an `asyncio.Lock`), and `index_html` (cached). Routes access these via `Depends` providers in `app/deps.py` (`get_engine`, `get_debater_repository`) rather than module-level globals. Intentional single-user, in-memory only — no multi-user or persistence support.
@@ -89,7 +91,7 @@ The backend is organised as an `app/` package; `main.py` is a thin shim (`app = 
 
 ## Frontend layout
 
-Single-page app in `static/` using vanilla ES modules (no bundler, no framework, no JSX). Loaded via `<script type="module">` in `index.html`. **CDN-only deps**: `marked` (markdown) and `lucide` (icons); both degrade gracefully when offline.
+Single-page app in `static/` using vanilla ES modules (no bundler, no framework, no JSX). Loaded via `<script type="module">` in `index.html`. **Deps vendored locally** in `static/vendor/`: `marked@12.0.2` (markdown) + `lucide@0.469.0` (icons), loaded via `<script defer>` (the **marked version is a deliberate security pin** — marked has had XSS regressions; don't bump without checking). `markdown.js`/`utils.js` still degrade gracefully if the globals are missing (only hit in tests). To update a vendored lib, download from the Aliyun mirror into `static/vendor/` and bump the `?v=` cache-bust in `index.html`.
 
 ```
 static/
@@ -100,7 +102,7 @@ static/
 │   ├── api.js              # fetch calls + FastAPI error-format flattening
 │   ├── sse.js              # SSEClient extends EventSource wrapper
 │   ├── state.js            # UIState FSM (idle/debating/paused/stopped/judging)
-│   ├── markdown.js         # marked config + [[Name]] mention / concession decoration
+│   ├── markdown.js         # marked config + [[Name]] mention decoration
 │   ├── renderer.js         # streaming bubbles, thinking section, tool cards, judge turn
 │   ├── autoscroll.js       # sentinel + IntersectionObserver + floating jump button
 │   ├── debaters.js         # debater list render, HTML5 drag reorder, keyboard reorder
@@ -114,19 +116,22 @@ static/
     ├── base.css            # reset, scrollbar, focus ring
     ├── layout.css          # sidebar/chat shell + responsive breakpoint
     ├── components.css      # buttons, inputs, debater items, toasts
-    ├── messages.css        # bubbles, skeleton, cursor, concessions, mentions
+    ├── messages.css        # bubbles, skeleton, cursor, mentions, judge accent
     └── search.css          # search drawer
 ```
 
 Key frontend patterns:
 - **Language**: UI text and preset debaters are in Chinese (`lang="zh-CN"`)
 - SSE connection handles all event types including `thinking_chunk` and `tool_call`
-- Thinking sections use CSS Grid collapse for smooth fold animations
+- **`[[Name]]` is the ONLY custom markup the model is asked to emit** (`DEBATE_RULES`), and the only custom markup `markdown.js` detects → `<span class="mention">` badge. A `[退让]…[/退让]` concession feature existed and was removed: it depended on the model reliably emitting paired tags (it didn't), and its second `marked.parse` pass re-escaped mention spans and leaked literal tag text. **Do not re-introduce paired/closing custom markup the model must produce** — it's fragile. Plain `[[Name]]` (no closing tag) is the tolerable edge.
+- **Mention rendering order matters**: `[[Name]]` → `\u0000MENTION_N\u0000` placeholder *before* `marked.parse`, expanded to `<span class="mention">` only *after* all parsing. Pre-expanding lets marked's `renderer.html` (raw-HTML escape) eat the span. `markdown.test.js`'s stub replicates that escaping so it catches this regression.
+- Thinking sections + tool-card results **default to EXPANDED** (`finalize()` no longer collapses thinking; tool cards don't start with `tool-card-collapsed`). The header toggle still collapses manually. Don't "fix" these back to collapsed-by-default.
+- Per-debater bubble tint: `renderer.js` sets `--bubble-color` on each `.message.ai`; `messages.css` uses `color-mix(in srgb, var(--bubble-color) 8%, var(--bg-elevated))`. Degrades gracefully (declaration dropped on browsers without `color-mix`).
+- Thinking sections use CSS Grid collapse for the fold animation; the tool-card fold uses the same `grid-template-rows: 0fr` trick. Note: the collapsing grid item must have **no vertical padding** (padding blocks the `0fr` fold and leaks a background sliver) — vertical padding lives on its first/last children instead.
 - UI state machine: `idle` → `debating` → `paused`/`stopped`
 - Debaters are draggable to set turn order (HTML5 DnD; **mobile/touch not supported**)
-- `marked.js` renders Markdown; `[[Name]]` patterns become highlighted mention badges
 - Download exports the chat as a self-contained HTML file
-- Auto-triggers judge when debate ends naturally (max rounds reached)
+- Auto-triggers judge when debate ends naturally (max rounds reached); the 5-second countdown toast auto-dismisses when the timer fires
 
 ## Test conventions (non-obvious)
 
@@ -134,7 +139,7 @@ Key frontend patterns:
 - **Bug-fix tests live in `tests/test_bug_fixes.py`** named `test_bN_<topic>` where N matches the audit ID. The historical audit covers B1–B32, but **11 IDs (B13, B14, B17, B23, B24, B26–B29, B31, B32) have no regression test** — they were either merged into other tests or never independently fixed. When fixing a regression, continue the `test_bN_*` convention.
 - **Engine tests build via `object.__new__(DebateEngine)` + manual attribute init**, NOT via `__init__` (which constructs real PydanticAI agents needing API keys). There is a **single shared helper `_make_engine()` in `tests/conftest.py`** — when you add an attribute to `DebateEngine`, update it (previously two helpers existed; they were consolidated).
 - **Frontend tests use jsdom** with central stubs in `tests-js/helpers/jsdom-env.js` for `matchMedia`, `CSS.escape`, `IntersectionObserver`, and `HTMLDialogElement.showModal`. `EventSource` is stubbed per-test-file (`tests-js/sse.test.js`) because it carries test-specific behavior. Every test file must call `setupDom()` before importing from `static/`.
-- **marked and lucide are CDN-only** and absent in tests. `markdown.js` degrades to plain-text; `utils.refreshIcons()` is a no-op without `window.lucide`. A shared `marked` stub lives in `tests-js/helpers/marked-stub.js`.
+- **marked and lucide are vendored but absent in tests.** Each frontend test file defines its own inline `globalThis.window.marked = {…}` stub (there is **no shared stub file** despite old docs claiming `tests-js/helpers/marked-stub.js`). `markdown.js` degrades to plain-text without `window.marked`; `utils.refreshIcons()` is a no-op without `window.lucide`. The `markdown.test.js` stub is the faithful one — it runs raw HTML through a `renderer.html` override the way real marked does, so it catches XSS/escape regressions; mirror that behaviour when adding markdown tests.
 - `asyncio_mode = "auto"` in `pyproject.toml` — async tests don't need `@pytest.mark.asyncio` (adding it is harmless).
 
 ## Constraints an agent would miss
