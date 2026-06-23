@@ -57,3 +57,8 @@ ai-debate-course/index.html
 # Node
 node_modules/
 package-lock.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
