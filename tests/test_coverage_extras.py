@@ -25,36 +25,26 @@ from app.deps import (
     get_engine,
     get_settings,
 )
-from app.engine.debate import DebateEngine
-from app.engine.event_bus import EventBus
+from app.engine.debate import AgentBundle, DebateEngine
 from app.engine.state import DebateState, Event
 from app.models import Debater
 from tests.conftest import MockDebateAgent
 
 
 def _bare_engine() -> DebateEngine:
-    """Build a DebateEngine without invoking __init__ but with the attributes
-    every engine method touches initialised to safe defaults.
+    """Build a DebateEngine with MagicMock agents via normal __init__.
 
     Centralised so the tests don't have to keep up with attribute drift when
     we add new state to the engine (e.g. event_log, judge_task)."""
-    eng = object.__new__(DebateEngine)
-    eng.model = "m"
-    eng.base_url = None
-    eng.api_key = None
-    eng.brave_api_key = ""
-    eng.debater_agent = MagicMock()
-    eng.debater_agent_no_search = MagicMock()
-    eng.judge_agent = MagicMock()
-    eng._extractor_agent = MagicMock()
-    eng.state = None
-    eng._events = EventBus()
-    eng._loop_task = None
-    eng.judge_task = None
-    eng._history = {}
-    eng._extraction_tasks = set()
-    eng._consumer_active = False
-    return eng
+    return DebateEngine(
+        model="m",
+        agents=AgentBundle(
+            debater=MagicMock(),
+            debater_no_search=MagicMock(),
+            judge=MagicMock(),
+            extractor=MagicMock(),
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

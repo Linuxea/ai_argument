@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.engine.debate import DebateEngine
+from app.engine.debate import AgentBundle, DebateEngine
 from app.engine.event_bus import EventBus
 from app.engine.state import DebateState, Event, Message
 from app.models import ArgumentSummary, Debater
@@ -12,25 +12,17 @@ from tests.conftest import MockDebateAgent
 
 
 def _make_engine(responses=None):
-    """Create a DebateEngine with mocked agents."""
-
+    """Create a DebateEngine with mocked agents injected via normal __init__."""
     mock = MockDebateAgent(responses=responses)
-    engine = object.__new__(DebateEngine)
-    engine.model = "test:model"
-    engine.base_url = None
-    engine.api_key = None
-    engine.brave_api_key = ""
-    engine.debater_agent = mock
-    engine.debater_agent_no_search = mock
-    engine.judge_agent = MockDebateAgent(responses=responses or ["Judgment."])
-    engine._extractor_agent = MockDebateAgent(responses=['{"points": ["mock claim"]}'])
-    engine.state = None
-    engine._events = EventBus()
-    engine._loop_task = None
-    engine.judge_task = None
-    engine._history = {}
-    engine._extraction_tasks = set()
-    engine._consumer_active = False
+    engine = DebateEngine(
+        model="test:model",
+        agents=AgentBundle(
+            debater=mock,
+            debater_no_search=mock,
+            judge=MockDebateAgent(responses=responses or ["Judgment."]),
+            extractor=MockDebateAgent(responses=['{"points": ["mock claim"]}']),
+        ),
+    )
     return engine, mock
 
 
