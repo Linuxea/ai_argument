@@ -1,6 +1,18 @@
-// renderer.js — streaming message renderer with rAF-batched markdown
-import { icon, refreshIcons, sanitizeColor, formatTime } from './utils.js';
+// renderer.js — streaming message renderer with rAF-batched markdown.
+//
+// Owns the streaming state machine (current bubble, rAF scheduling,
+// append/finalize lifecycle). DOM construction is delegated to bubble.js so
+// this file is just control flow, not element-by-element DOM building.
+import { refreshIcons } from './utils.js';
 import { renderMarkdown } from './markdown.js';
+import {
+    createDebaterBubble,
+    createSkeleton,
+    createThinkingSection,
+    createToolCard,
+    createSystemMessage,
+    createUserMessage,
+} from './bubble.js';
 
 export class MessageRenderer {
     /**
@@ -85,41 +97,9 @@ export class MessageRenderer {
         this.hideEmptyState();
         this.currentDebater = debater;
 
-        const message = document.createElement('div');
         const isConsecutive = (this._lastSpeakerName === debater.name && this._lastSpeakerType === 'debater');
-        message.className = isConsecutive ? 'message ai continuation' : 'message ai';
-        message.dataset.speaker = debater.name;
-        message.style.setProperty('--bubble-color', sanitizeColor(debater.color));
-
-        const header = document.createElement('div');
-        header.className = 'message-header';
-
-        if (!isConsecutive) {
-            const av = document.createElement('span');
-            av.className = 'message-avatar';
-            av.textContent = debater.avatar || '💬';
-            header.appendChild(av);
-
-            const sender = document.createElement('span');
-            sender.className = 'message-sender';
-            sender.style.color = sanitizeColor(debater.color);
-            sender.textContent = debater.name;
-            header.appendChild(sender);
-        }
-
-        const timeEl = document.createElement('span');
-        timeEl.className = 'message-time';
-        timeEl.textContent = formatTime();
-        header.appendChild(timeEl);
-
-        message.appendChild(header);
-
-        // Skeleton placeholder — replaced on first chunk
-        const skel = document.createElement('div');
-        skel.className = 'message-skeleton';
-        skel.dataset.skeleton = '1';
-        skel.innerHTML = `<span class="skeleton-dots"><span></span><span></span><span></span></span><span>正在斟酌……</span>`;
-        message.appendChild(skel);
+        const message = createDebaterBubble(debater, isConsecutive);
+        message.appendChild(createSkeleton());
 
         this.container.insertBefore(message, this.scroller.sentinel);
         this.currentMessageContainer = message;
@@ -182,48 +162,7 @@ export class MessageRenderer {
         this._removeSkeleton();
 
         if (!this.currentThinkingEl) {
-            const section = document.createElement('div');
-            section.className = 'thinking-section';
-
-            const header = document.createElement('div');
-            header.className = 'thinking-header';
-            header.setAttribute('role', 'button');
-            header.setAttribute('tabindex', '0');
-            header.setAttribute('aria-expanded', 'true');
-
-            const toggle = document.createElement('span');
-            toggle.className = 'thinking-toggle';
-            toggle.textContent = '▼';
-
-            const label = document.createElement('span');
-            label.className = 'thinking-label';
-            label.textContent = '思考中…';
-
-            header.append(toggle, label);
-
-            const text = document.createElement('div');
-            text.className = 'thinking-text';
-
-            const inner = document.createElement('div');
-            inner.className = 'thinking-text-inner';
-            text.appendChild(inner);
-
-            section.append(header, text);
-
-            // Click & keyboard toggle
-            const toggleFn = () => {
-                const collapsed = text.classList.toggle('thinking-collapsed');
-                toggle.textContent = collapsed ? '▶' : '▼';
-                header.setAttribute('aria-expanded', String(!collapsed));
-            };
-            header.addEventListener('click', toggleFn);
-            header.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggleFn();
-                }
-            });
-
+            const section = createThinkingSection();
             // Insert before any message-content
             this.currentMessageContainer.appendChild(section);
             this.currentThinkingEl = section;
@@ -260,7 +199,7 @@ export class MessageRenderer {
 
     /** Finalize the active message (called at debater_finalize / debater_end). */
     finalize() {
-        // Collapse thinking section
+        // Thinking section
         let thinkingHasContent = false;
         if (this.currentThinkingEl) {
             const inner = this.currentThinkingEl.querySelector('.thinking-text-inner');
@@ -270,7 +209,7 @@ export class MessageRenderer {
                 const label = this.currentThinkingEl.querySelector('.thinking-label');
                 const header = this.currentThinkingEl.querySelector('.thinking-header');
                 // Keep the thinking section expanded by default; the user can
-                // still collapse it via the header toggle above.
+                // still collapse it via the header toggle in bubble.js.
                 toggle.textContent = '▼';
                 label.textContent = '思考过程';
                 header?.setAttribute('aria-expanded', 'true');
@@ -315,12 +254,7 @@ export class MessageRenderer {
 
     /** Add a system notice line. */
     addSystem(text) {
-        const m = document.createElement('div');
-        m.className = 'message system';
-        const c = document.createElement('div');
-        c.className = 'message-content';
-        c.textContent = text;
-        m.appendChild(c);
+        const m = createSystemMessage(text);
         this.container.insertBefore(m, this.scroller.sentinel);
         // Reset speaker grouping after a system divider
         this._lastSpeakerName = null;
@@ -330,31 +264,7 @@ export class MessageRenderer {
 
     /** Append a user message. */
     addUser(text) {
-        const m = document.createElement('div');
-        m.className = 'message user';
-
-        const header = document.createElement('div');
-        header.className = 'message-header';
-
-        const avatar = document.createElement('span');
-        avatar.className = 'message-avatar';
-        avatar.textContent = '👤';
-
-        const sender = document.createElement('span');
-        sender.className = 'message-sender';
-        sender.textContent = '你';
-
-        const time = document.createElement('span');
-        time.className = 'message-time';
-        time.textContent = formatTime();
-
-        header.append(avatar, sender, time);
-
-        const content = document.createElement('div');
-        content.className = 'message-content';
-        content.textContent = text;
-
-        m.append(header, content);
+        const m = createUserMessage(text);
         this.container.insertBefore(m, this.scroller.sentinel);
 
         this._lastSpeakerName = '__user';
@@ -364,79 +274,15 @@ export class MessageRenderer {
 
     /** Add a tool-call card (web search result). */
     addToolCard({ debaterName, query, resultSummary }) {
-        const message = document.createElement('div');
         const isConsecutive = (this._lastSpeakerName === debaterName && this._lastSpeakerType === 'debater');
-        message.className = isConsecutive ? 'message ai tool-card continuation' : 'message ai tool-card';
-        message.dataset.speaker = debaterName;
-        message.style.setProperty('--bubble-color', sanitizeColor(this.currentDebater?.color || '#333333'));
-
-        const header = document.createElement('div');
-        header.className = 'message-header';
-
-        if (!isConsecutive) {
-            const av = document.createElement('span');
-            av.className = 'message-avatar';
-            av.textContent = this.currentDebater?.avatar || '🔍';
-            header.appendChild(av);
-
-            const sender = document.createElement('span');
-            sender.className = 'message-sender';
-            sender.style.color = sanitizeColor(this.currentDebater?.color || '#333');
-            sender.textContent = debaterName;
-            header.appendChild(sender);
-        }
-
-        const time = document.createElement('span');
-        time.className = 'message-time';
-        time.textContent = formatTime();
-        header.appendChild(time);
-
-        const content = document.createElement('div');
-        content.className = 'tool-card-content';
-
-        const label = document.createElement('div');
-        label.className = 'tool-card-label';
-        label.setAttribute('role', 'button');
-        label.setAttribute('tabindex', '0');
-        label.setAttribute('aria-expanded', 'true');
-
-        const toggle = document.createElement('span');
-        toggle.className = 'tool-card-toggle';
-        toggle.textContent = '▼';
-
-        const labelText = document.createElement('span');
-        labelText.textContent = '检索: ';
-
-        const querySpan = document.createElement('span');
-        querySpan.className = 'tool-card-query';
-        querySpan.textContent = query || '(空)';
-
-        const searchIcon = icon('search');
-        label.append(toggle, searchIcon, labelText, querySpan);
-
-        const results = document.createElement('div');
-        results.className = 'tool-card-results';
-
-        const inner = document.createElement('div');
-        inner.className = 'tool-card-results-inner';
-        inner.innerHTML = renderMarkdown(resultSummary || '');
-        results.appendChild(inner);
-
-        const toggleFn = () => {
-            const collapsed = results.classList.toggle('tool-card-collapsed');
-            toggle.textContent = collapsed ? '▶' : '▼';
-            label.setAttribute('aria-expanded', String(!collapsed));
-        };
-        label.addEventListener('click', toggleFn);
-        label.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                toggleFn();
-            }
+        const message = createToolCard({
+            name: debaterName,
+            color: this.currentDebater?.color,
+            avatar: this.currentDebater?.avatar,
+            query,
+            resultSummary,
+            isConsecutive,
         });
-
-        content.append(label, results);
-        message.append(header, content);
         this.container.insertBefore(message, this.scroller.sentinel);
         this._lastSpeakerName = debaterName;
         this._lastSpeakerType = 'debater';
