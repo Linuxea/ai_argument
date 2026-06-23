@@ -6,6 +6,7 @@ import { setupDom } from './helpers/jsdom-env.js';
 setupDom();
 
 const { SearchPanel } = await import('../static/modules/search.js');
+const { MessageStore } = await import('../static/modules/store.js');
 
 function makePanel() {
     document.body.innerHTML = `
@@ -16,7 +17,7 @@ function makePanel() {
                     <span class="message-sender" style="color: #00ff00">Alice</span>
                     <span class="message-time">10:00</span>
                 </div>
-                <div class="message-content" data-raw="hello world from Alice"></div>
+                <div class="message-content"></div>
             </div>
             <div class="message ai" data-speaker="B">
                 <div class="message-header">
@@ -24,7 +25,7 @@ function makePanel() {
                     <span class="message-sender" style="color: #ff0000">Bob</span>
                     <span class="message-time">10:01</span>
                 </div>
-                <div class="message-content" data-raw="goodbye world"></div>
+                <div class="message-content"></div>
             </div>
         </div>
         <dialog id="search-dialog">
@@ -33,12 +34,20 @@ function makePanel() {
             <button id="search-toggle"></button>
         </dialog>
     `;
+    // Build a MessageStore with records pointing at the DOM elements above
+    // (mirrors what the renderer would do on finalize).
+    const store = new MessageStore();
+    const messages = document.getElementById('messages');
+    const elA = messages.querySelector('[data-speaker="A"]');
+    const elB = messages.querySelector('[data-speaker="B"]');
+    store.add({ el: elA, role: 'debater', speaker: 'Alice', color: '#00ff00', avatar: '🟢', time: '10:00', text: 'hello world from Alice' });
+    store.add({ el: elB, role: 'debater', speaker: 'Bob',   color: '#ff0000', avatar: '🔴', time: '10:01', text: 'goodbye world' });
     return new SearchPanel({
         dialog: document.getElementById('search-dialog'),
         input: document.getElementById('search-input'),
         results: document.getElementById('search-results'),
         openBtn: document.getElementById('search-toggle'),
-        messagesContainer: document.getElementById('messages'),
+        store,
     });
 }
 

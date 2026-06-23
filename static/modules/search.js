@@ -2,12 +2,12 @@
 import { debounce, escapeHtml, escapeRegex, sanitizeColor, refreshIcons } from './utils.js';
 
 export class SearchPanel {
-    constructor({ dialog, input, results, openBtn, messagesContainer }) {
+    constructor({ dialog, input, results, openBtn, store }) {
         this.dialog = dialog;
         this.input = input;
         this.results = results;
         this.openBtn = openBtn;
-        this.messagesContainer = messagesContainer;
+        this.store = store;
 
         this._handleSearch = debounce(() => this._runSearch(), 140);
         this.input.addEventListener('input', this._handleSearch);
@@ -44,24 +44,19 @@ export class SearchPanel {
     }
 
     _indexMessages() {
-        this._messageIndex = [];
-        const msgEls = this.messagesContainer.querySelectorAll('.message');
-        msgEls.forEach((el, idx) => {
-            const contentEl = el.querySelector('.message-content') ||
-                              el.querySelector('.tool-card-content');
-            if (!contentEl) return;
-            const text = contentEl.dataset.raw || contentEl.innerText || '';
-            if (!text.trim()) return;
-            this._messageIndex.push({
+        // Read finalised messages from the central MessageStore (DOM is no
+        // longer the source of truth for search — see store.js).
+        this._messageIndex = this.store.all()
+            .filter((rec) => rec.text && rec.text.trim())
+            .map((rec, idx) => ({
                 id: idx,
-                element: el,
-                text,
-                sender: el.querySelector('.message-sender')?.textContent || '',
-                avatar: el.querySelector('.message-avatar')?.textContent || '',
-                time:   el.querySelector('.message-time')?.textContent || '',
-                color:  el.querySelector('.message-sender')?.style.color || '',
-            });
-        });
+                element: rec.el,
+                text: rec.text,
+                sender: rec.speaker || '',
+                avatar: rec.avatar || '',
+                time: rec.time || '',
+                color: rec.color || '',
+            }));
     }
 
     _runSearch() {
@@ -152,7 +147,11 @@ export class SearchPanel {
         }
         this._highlightTimers = [];
 
-        this.messagesContainer.querySelectorAll('.message.highlight').forEach((n) => n.classList.remove('highlight'));
+        // Clear any prior highlights — iterate store records instead of
+        // querying DOM globally.
+        for (const rec of this.store.all()) {
+            rec.el?.classList?.remove('highlight');
+        }
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.add('highlight');
         const t = setTimeout(() => el.classList.remove('highlight'), 2000);

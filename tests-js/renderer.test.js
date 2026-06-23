@@ -190,3 +190,36 @@ test('F3: tool-card results are expanded by default (not collapsed)', () => {
     const toggle = messages.querySelector('.tool-card-toggle');
     assert.equal(toggle.textContent, '▼');
 });
+
+test('F: renderer populates MessageStore on finalize / addSystem / addUser / addToolCard', async () => {
+    const { MessageStore } = await import('../static/modules/store.js');
+    document.body.innerHTML = '<div class="chat-area"><div id="messages"></div></div>';
+    const messages = document.getElementById('messages');
+    const sentinel = document.createElement('div');
+    messages.appendChild(sentinel);
+    const scroller = { sentinel, schedule: () => {}, pinSentinel: () => {}, scrollToBottom: () => {} };
+    const store = new MessageStore();
+    const renderer = new MessageRenderer(messages, scroller, store);
+
+    renderer.startDebaterTurn({ name: '正方', color: '#2ecc71', avatar: '🟢' });
+    renderer.appendChunk('first speech');
+    renderer.endTurn();
+    renderer.addSystem('round 1 done');
+    renderer.addUser('user comment');
+    renderer.startDebaterTurn({ name: '反方', color: '#e74c3c', avatar: '🔴' });
+    renderer.addToolCard({ debaterName: '反方', query: 'q', resultSummary: 'summary' });
+    renderer.appendChunk('rebuttal');
+    renderer.endTurn();
+
+    const recs = store.all();
+    const roles = recs.map((r) => r.role);
+    assert.deepEqual(roles, ['debater', 'system', 'user', 'tool', 'debater']);
+    assert.equal(recs[0].speaker, '正方');
+    assert.ok(recs[0].text.includes('first speech'));
+    assert.equal(recs[3].speaker, '反方');
+    assert.ok(recs[3].text.includes('summary'));
+
+    // reset() clears the store
+    renderer.reset();
+    assert.equal(store.all().length, 0);
+});

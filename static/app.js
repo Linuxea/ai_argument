@@ -10,6 +10,7 @@ import { AutoScroller } from './modules/autoscroll.js';
 import { MessageRenderer } from './modules/renderer.js';
 import { DebaterList } from './modules/debaters.js';
 import { SearchPanel } from './modules/search.js';
+import { MessageStore } from './modules/store.js';
 
 const STORAGE_MAX_ROUNDS = 'max_rounds';
 const STORAGE_SEARCH_ENABLED = 'search_enabled';
@@ -34,14 +35,15 @@ class DebateApp {
         this._bindEvents();
 
         this.scroller = new AutoScroller(this.messages);
-        this.renderer = new MessageRenderer(this.messages, this.scroller);
+        this.store = new MessageStore();
+        this.renderer = new MessageRenderer(this.messages, this.scroller, this.store);
         this.debaterList = new DebaterList(this.debaterListEl);
         this.search = new SearchPanel({
             dialog: this.searchDialog,
             input: this.searchInput,
             results: this.searchResults,
             openBtn: this.searchToggleBtn,
-            messagesContainer: this.messages,
+            store: this.store,
         });
 
         this.state = new UIState('idle', (s) => this._applyUIState(s));

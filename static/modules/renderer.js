@@ -18,10 +18,13 @@ export class MessageRenderer {
     /**
      * @param {HTMLElement} container - messages list
      * @param {AutoScroller} scroller
+     * @param {MessageStore|null} store - if given, finalised messages are
+     *        recorded here as the canonical source of truth for search/export.
      */
-    constructor(container, scroller) {
+    constructor(container, scroller, store = null) {
         this.container = container;
         this.scroller = scroller;
+        this.store = store;
         this._lastSpeakerName = null;
         this._lastSpeakerType = null;
 
@@ -47,6 +50,8 @@ export class MessageRenderer {
         this.currentDebater = null;
         // sentinel may have been removed; re-attach
         this.scroller.pinSentinel();
+        // Drop recorded messages too — the store is the canonical history.
+        this.store?.clear();
     }
 
     /** Show an empty-state hint. */
@@ -234,6 +239,25 @@ export class MessageRenderer {
             }
         }
 
+        // Record the finalised message in the store (canonical source of truth
+        // for search/export). Only if the bubble was kept — finalize() above
+        // removes empty ones. Judge turns are tagged via dataset.judge.
+        if (this.store && this.currentMessageContainer?.isConnected) {
+            const c = this.currentMessageContainer;
+            const thinkingRaw = c.querySelector('.thinking-text-inner')?.dataset.raw || '';
+            const textRaw = this.currentMessageEl?.dataset.raw || '';
+            const searchable = [textRaw, thinkingRaw].filter(Boolean).join('\n');
+            this.store.add({
+                el: c,
+                role: c.dataset.judge === 'true' ? 'judge' : 'debater',
+                speaker: this.currentDebater?.name || '',
+                color: this.currentDebater?.color || '',
+                avatar: this.currentDebater?.avatar || '',
+                time: c.querySelector('.message-time')?.textContent || '',
+                text: searchable,
+            });
+        }
+
         this.currentMessageContainer = null;
         this.currentMessageEl = null;
         this.currentThinkingEl = null;
@@ -256,6 +280,9 @@ export class MessageRenderer {
     addSystem(text) {
         const m = createSystemMessage(text);
         this.container.insertBefore(m, this.scroller.sentinel);
+        this.store?.add({
+            el: m, role: 'system', speaker: '', color: '', avatar: '', time: '', text,
+        });
         // Reset speaker grouping after a system divider
         this._lastSpeakerName = null;
         this._lastSpeakerType = null;
@@ -266,6 +293,15 @@ export class MessageRenderer {
     addUser(text) {
         const m = createUserMessage(text);
         this.container.insertBefore(m, this.scroller.sentinel);
+        this.store?.add({
+            el: m,
+            role: 'user',
+            speaker: '你',
+            color: '',
+            avatar: '👤',
+            time: m.querySelector('.message-time')?.textContent || '',
+            text,
+        });
 
         this._lastSpeakerName = '__user';
         this._lastSpeakerType = 'user';
@@ -284,6 +320,15 @@ export class MessageRenderer {
             isConsecutive,
         });
         this.container.insertBefore(message, this.scroller.sentinel);
+        this.store?.add({
+            el: message,
+            role: 'tool',
+            speaker: debaterName,
+            color: this.currentDebater?.color || '',
+            avatar: this.currentDebater?.avatar || '',
+            time: message.querySelector('.message-time')?.textContent || '',
+            text: [query, resultSummary].filter(Boolean).join('\n'),
+        });
         this._lastSpeakerName = debaterName;
         this._lastSpeakerType = 'debater';
         this.scroller.schedule({ counted: true });
