@@ -11,6 +11,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.engine.state import DebateState
+from app.models import Debater
+from app.prompts.defense import (
+    TOPIC_CLOSE,
+    TOPIC_NOTE,
+    TOPIC_OPEN,
+    USER_MSG_CLOSE,
+    USER_MSG_NOTE,
+    USER_MSG_OPEN,
+)
 from app.prompts.loader import load_prompt
 from app.prompts.stances import STANCE_INSTRUCTIONS
 
@@ -61,3 +71,71 @@ def build_debater_system_prompt(deps) -> str:
         parts.append(SEARCH_INSTRUCTIONS)
 
     return "\n\n---\n\n".join(parts)
+
+
+def build_debater_user_prompt(state: DebateState, debater: Debater) -> str:
+    """Build the user prompt for ``debater``'s next turn.
+
+    The debater's own past messages are excluded — they're already in
+    ``message_history`` as prior ``ModelResponse`` entries managed by
+    PydanticAI, so restating them would double-count. Round-dependent context
+    (countdown, opening-search guidance) lives here so the system prompt stays
+    cache-stable.
+    """
+    parts: list[str] = []
+
+    if not state.history:
+        parts.append(
+            "You are the first speaker. "
+            "No one has spoken yet - do NOT reference or quote anyone. "
+            "Present your opening argument on the topic below. " + TOPIC_NOTE
+        )
+        parts.append(f"{TOPIC_OPEN}{state.topic}{TOPIC_CLOSE}")
+    else:
+        parts.append("Debate topic (" + TOPIC_NOTE + "):")
+        parts.append(f"{TOPIC_OPEN}{state.topic}{TOPIC_CLOSE}")
+        parts.append(USER_MSG_NOTE)
+
+        if state.argument_summaries:
+            summary_lines = ["[Key arguments raised so far]:"]
+            for s in state.argument_summaries:
+                points_text = "; ".join(s.points)
+                summary_lines.append(f"Round {s.round + 1} - {s.debater_name}: {points_text}")
+            parts.append("\n".join(summary_lines))
+
+        for msg in state.history:
+            if msg.speaker == debater.name:
+                continue
+            if msg.speaker == "You":
+                parts.append(f"[You]: {USER_MSG_OPEN}{msg.content}{USER_MSG_CLOSE}")
+            else:
+                parts.append(f"[{msg.speaker}]: {msg.content}")
+
+    _append_round_context(parts, state, debater)
+    return "\n\n".join(parts)
+
+
+def _append_round_context(parts: list[str], state: DebateState, debater: Debater) -> None:
+    """Append round countdown (when bounded) and opening-search guidance (round 0)."""
+    current = state.current_round + 1
+
+    if state.max_rounds is not None:
+        remaining = state.max_rounds - state.current_round
+        if remaining <= 1:
+            parts.append(
+                f"This is round {current} of {state.max_rounds} - "
+                "FINAL ROUND. Make your strongest closing argument. No holding back."
+            )
+        else:
+            plural = "s" if remaining - 1 != 1 else ""
+            parts.append(
+                f"This is round {current} of {state.max_rounds}. "
+                f"There {'is' if remaining - 1 == 1 else 'are'} {remaining - 1} "
+                f"round{plural} remaining after this one."
+            )
+
+    if state.current_round == 0 and debater.enable_search:
+        parts.append(
+            "This is your opening round: you may search 2-4 times to gather "
+            "supporting evidence before presenting your argument."
+        )
