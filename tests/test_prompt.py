@@ -1,7 +1,7 @@
 """Tests for build_debater_user_prompt — no engine/agent construction."""
 from app.engine.state import DebateState, Message
 from app.models import ArgumentSummary, Debater
-from app.prompts.debater import build_debater_user_prompt
+from app.prompts import build_debater_user_prompt
 
 
 def _debater(**kw):
