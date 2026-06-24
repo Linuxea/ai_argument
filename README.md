@@ -135,12 +135,19 @@ ai_argument/
 │   ├── config.py                # Pydantic Settings (.env) + cached load_presets()
 │   ├── deps.py                  # FastAPI Depends + DebaterRepository
 │   ├── models.py                # API models + Stance literals + length caps
-│   ├── agents.py                # PydanticAI agent factories + _load_prompt(prompts/*.md)
+│   ├── agents.py                # PydanticAI agent factories (thin adapter over app.prompts)
 │   ├── tools.py                 # web_search tool (Brave, 1 req/sec, graceful errors)
 │   ├── presets.yaml             # preset debaters (3 Chinese personas)
+│   ├── prompts/                 # prompt assembly (zero PydanticAI dep): system/user/judge builders
+│   │   ├── loader.py            # load_prompt(prompts/*.md)
+│   │   ├── defense.py           # injection-defense fence constants
+│   │   ├── stances.py           # STANCE_INSTRUCTIONS
+│   │   ├── debater.py           # build_debater_system_prompt (cache-stable) + build_debater_user_prompt
+│   │   ├── judge.py             # build_judge_transcript + JUDGE_SYSTEM_PROMPT
+│   │   ├── extract.py           # EXTRACT_POINTS_PROMPT
+│   │   └── topic.py             # TOPIC_REFINE_PROMPT
 │   ├── engine/
-│   │   ├── state.py             # Message / DebateState / Event dataclasses
-│   │   ├── prompt.py            # pure build_user_prompt(state, debater)
+│   │   ├── state.py             # Message / DebateState / Event / DebaterDeps dataclasses
 │   │   ├── event_bus.py         # SSE event queue + 500-event replay buffer
 │   │   └── debate.py            # DebateEngine: turn loop, SSE, AgentBundle injection
 │   └── routes/                  # debate / debaters / topic

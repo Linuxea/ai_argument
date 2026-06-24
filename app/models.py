@@ -18,7 +18,7 @@ MAX_DEBATERS = 20
 MAX_ROUNDS = 50
 
 # Centralised stance vocabulary. Used by Debater, CustomDebaterRequest and
-# STANCE_INSTRUCTIONS in app.agents — keep all three in sync via this alias.
+# STANCE_INSTRUCTIONS in app.prompts.stances — keep all three in sync via this alias.
 Stance = Literal["正方", "反方", "中立"]
 
 

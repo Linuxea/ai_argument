@@ -36,14 +36,15 @@ The LLM layer uses **PydanticAI Agents** (not raw OpenAI SDK, except `app/routes
 - **`create_judge_agent()`** — judge agent, no tools, no thinking
 - **`create_extractor_agent()`** — lightweight agent extracting key claims per turn (for cross-round memory)
 
-Each agent uses `DebaterDeps` for dependency injection (topic, debater config, round number, Brave API key). The `instructions` callback (`_build_debater_instructions`) rebuilds the system prompt fresh on every run, composing: date context → `DEBATE_RULES` → (round ≥ 1: `STRATEGY_INSTRUCTIONS` + `MEMORY_INSTRUCTIONS`) → stance → personality → `SEARCH_INSTRUCTIONS` (if search enabled) → round countdown. **Personality is framed as HIGHEST-priority voice/tone** and explicitly overrides the generic "be professional / back up claims" style rules in `DEBATE_RULES` — without this framing, playful/contrarian characters get suppressed. Don't "tidy" that framing away.
+Each agent uses `DebaterDeps` for dependency injection (topic, debater config, round number, Brave API key). The `instructions` callback delegates to `prompts.build_debater_system_prompt(deps)`, which is **byte-identical across all rounds** for a given debater so the `[system]` segment is prefix-cacheable (DeepSeek/OpenAI cache the longest stable prefix). It composes: date context → `DEBATE_RULES` → `STRATEGY_INSTRUCTIONS` → `MEMORY_INSTRUCTIONS` → stance → personality → `SEARCH_INSTRUCTIONS` (if search enabled). **Round-dependent content (round countdown, opening-search guidance) is deliberately NOT in the system prompt** — it lives in the user prompt (`build_debater_user_prompt`) so the system prompt stays stable. **Personality is framed as HIGHEST-priority voice/tone** and explicitly overrides the generic "be professional / back up claims" style rules in `DEBATE_RULES` — without this framing, playful/contrarian characters get suppressed. Don't "tidy" that framing away.
 
 ### Core Algorithm: Prompt Building
 
-Prompts are composed in **two layers**:
+Prompt content and assembly live in **`app/prompts/`** (a package with **zero PydanticAI dependency** — pure functions + constants). `app/agents.py` is a thin adapter that wires `instructions=` callbacks to these builders.
 
-1. **Content** lives in `prompts/*.md` (debate_rules / search_instructions / strategy_instructions / memory_instructions / judge / extract_points / topic_refine), loaded once at import by `_load_prompt()` in `app/agents.py`. Edit a `.md` file to change wording — no Python touch, no ruff/coverage cycle.
-2. **User-prompt assembly** (the per-turn payload) is a pure function `build_user_prompt(state, debater)` in `app/engine/prompt.py`. `DebateEngine._build_user_prompt` is a one-line wrapper. Unit-testable without constructing an engine (`tests/test_prompt.py`).
+1. **Content** lives in `prompts/*.md` (debate_rules / search_instructions / strategy_instructions / memory_instructions / judge / extract_points / topic_refine), loaded once at import by `app.prompts.loader.load_prompt()`. Edit a `.md` file to change wording — no Python touch, no ruff/coverage cycle.
+2. **System-prompt assembly** is `build_debater_system_prompt(deps)` in `app/prompts/debater.py` (cache-stable across rounds; never reads `round_number`/`max_rounds`).
+3. **User-prompt assembly** (the per-turn payload) is `build_debater_user_prompt(state, debater)` in `app/prompts/debater.py`. `DebateEngine._build_user_prompt` is a one-line wrapper. Unit-testable without constructing an engine (`tests/test_prompt.py` + `tests/test_prompts_module.py`).
 
 For each debater's turn:
 - **Other** debaters' messages → `[Name]: content` in the user prompt
@@ -87,9 +88,9 @@ The backend is organised as an `app/` package; `main.py` is a thin shim (`app = 
 | File | Purpose |
 |------|---------|
 | `app/engine/debate.py` | `DebateEngine` — state, turn loop, SSE emission. Agents injected via `AgentBundle` (kwarg-only); production passes `agents=None` and gets the real PydanticAI agents, tests pass a mock bundle. |
-| `app/engine/prompt.py` | `build_user_prompt(state, debater)` — pure function, no engine/agent. The engine delegates here. |
-| `app/engine/state.py` | `Message` / `DebateState` / `Event` dataclasses (stdlib-only) |
-| `app/agents.py` | PydanticAI agent factories (`create_debater_agent` etc.); prompt constants loaded from `prompts/*.md` via `_load_prompt()`; `STANCE_INSTRUCTIONS` dict + the personality-framing logic stay inline. |
+| `app/engine/state.py` | `Message` / `DebateState` / `Event` / `DebaterDeps` dataclasses (stdlib-only) |
+| `app/prompts/` | Prompt assembly package (zero PydanticAI dependency): `build_debater_system_prompt(deps)` (cache-stable), `build_debater_user_prompt(state, debater)`, `build_judge_transcript(state)`, plus loaded prompt constants. Pure functions + `prompts/*.md` content. |
+| `app/agents.py` | PydanticAI agent factories (`create_debater_agent` etc.) — thin adapter over `app.prompts`; only model/tools/model-settings live here. |
 | `prompts/*.md` | Externalised prompt content (debate_rules, search, strategy, memory, judge, extract_points, topic_refine). Edit here, not Python. |
 | `app/tools.py` | `web_search` PydanticAI tool with Brave Search API + 1 req/sec rate limiting + graceful HTTP/JSON error handling (returns a string the LLM sees). |
 | `app/routes/*.py` | FastAPI routers (debate / debaters / topic), dependencies via `Depends` |
@@ -155,7 +156,7 @@ Key frontend patterns:
   engine = DebateEngine(model="test:model", agents=AgentBundle(
       debater=mock, debater_no_search=mock, judge=mock, extractor=mock))
   ```
-  The helpers `_make_engine` (`tests/test_debate_engine.py`) and `_bare_engine` (`tests/test_coverage_extras.py`) follow this pattern. Pure prompt logic is tested without an engine at all (`tests/test_prompt.py` calls `build_user_prompt` directly).
+  The helpers `_make_engine` (`tests/test_debate_engine.py`) and `_bare_engine` (`tests/test_coverage_extras.py`) follow this pattern. Pure prompt logic is tested without an engine at all (`tests/test_prompt.py` calls `build_debater_user_prompt` directly; `tests/test_prompts_module.py` covers the system-prompt builder incl. the cache-stability invariant, judge transcript, loader, defense constants).
 - **Frontend e2e** lives in `tests-e2e/`. Run with `npm run test:e2e` (after `npx playwright install chromium` once). The webServer config launches `python3 -m http.server 8765` from repo root so the page's `/static/...` paths resolve. Smoke spec covers vendored-deps load, F1 toggle default, real-marked `[[Name]]` rendering, and the residual-`[退让]` degradation.
 - **Frontend unit tests use jsdom** with central stubs in `tests-js/helpers/jsdom-env.js` for `matchMedia`, `CSS.escape`, `IntersectionObserver`, and `HTMLDialogElement.showModal`. `EventSource` is stubbed per-test-file (`tests-js/sse.test.js`). Every test file must call `setupDom()` before importing from `static/`. jsdom devDep is `^25` (not `^29` — older claim was stale).
 - **marked and lucide are vendored but absent in tests.** Each frontend test file defines its own inline `globalThis.window.marked = {…}` stub (no shared stub file). `markdown.js` degrades to plain-text without `window.marked`; `utils.refreshIcons()` is a no-op without `window.lucide`. The `markdown.test.js` stub is the faithful one — it runs raw HTML through a `renderer.html` override the way real marked does, so it catches XSS/escape regressions; mirror that behaviour when adding markdown tests.
