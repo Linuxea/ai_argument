@@ -58,7 +58,7 @@ def test_build_user_prompt_subsequent_turn():
     assert "Teachers are irreplaceable." not in prompt
     # Other speakers should appear
     assert "[Optimist]: AI can enhance learning." in prompt
-    assert "[You]: What about special needs?" in prompt
+    assert "[You]: <user_message>What about special needs?</user_message>" in prompt
     # Topic is fenced so injected content can't pose as instructions.
     assert "<topic>AI in education</topic>" in prompt
 

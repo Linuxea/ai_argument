@@ -54,3 +54,34 @@ def test_valid_inputs_within_caps_accepted():
     Debater(name="分析家", personality="冷静分析。")
     DebateConfig(topic="AI 是否应取代教师？", debater_names=["正方", "反方"])
     UserMessage(message="我的观点是……")
+
+
+def test_debater_name_rejects_brackets():
+    with pytest.raises(ValidationError):
+        Debater(name="evil[name]", personality="p")
+
+
+def test_debater_name_rejects_angle_brackets():
+    with pytest.raises(ValidationError):
+        Debater(name="evil<name>", personality="p")
+
+
+def test_debater_name_rejects_colon():
+    with pytest.raises(ValidationError):
+        Debater(name="evil:name", personality="p")
+
+
+def test_debater_name_rejects_braces():
+    with pytest.raises(ValidationError):
+        Debater(name="evil{name}", personality="p")
+
+
+def test_debater_name_rejects_newline():
+    with pytest.raises(ValidationError):
+        Debater(name="evil\nname", personality="p")
+
+
+def test_debater_name_accepts_normal_names():
+    Debater(name="张三分", personality="p")
+    Debater(name="The Optimist", personality="p")
+    Debater(name="abc-123_测试", personality="p")

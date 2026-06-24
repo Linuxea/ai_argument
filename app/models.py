@@ -41,6 +41,16 @@ class Debater(BaseModel):
     def validate_color(cls, v: str) -> str:
         return _validate_color(v)
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        forbidden = set("<>[]:{}")
+        if any(c in v for c in forbidden):
+            raise ValueError(f"name must not contain any of: {''.join(sorted(forbidden))}")
+        if "\n" in v or "\r" in v:
+            raise ValueError("name must be a single line")
+        return v
+
 
 class DebateConfig(BaseModel):
     topic: str = Field(max_length=MAX_TOPIC_LENGTH)

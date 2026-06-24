@@ -5,6 +5,8 @@ from pydantic_ai.models import Model
 from app.agents import (
     EXTRACT_POINTS_PROMPT,
     MEMORY_INSTRUCTIONS,
+    SEARCH_INSTRUCTIONS,
+    SEARCH_OPENING_INSTRUCTIONS,
     STRATEGY_INSTRUCTIONS,
     _build_debater_instructions,
     create_debater_agent,
@@ -47,7 +49,7 @@ def test_build_debater_instructions_contains_rules():
 
     assert "multi-party debate" in instructions
     assert "You are a test debater." in instructions
-    assert "balanced view" in instructions
+    assert "balanced, analytical view" in instructions
     # Personality is framed as the authoritative voice/tone persona so that
     # a playful/contrarian character isn't overruled by generic "be
     # professional" rules.
@@ -71,7 +73,7 @@ def test_build_debater_instructions_with_for_stance():
 
     instructions = _build_debater_instructions(ctx)
 
-    assert "support the topic" in instructions
+    assert "SUPPORT the topic" in instructions
     assert "This is round 1 of 3" in instructions
 
 
@@ -92,7 +94,7 @@ def test_build_debater_instructions_final_round():
     instructions = _build_debater_instructions(ctx)
 
     assert "FINAL ROUND" in instructions
-    assert "oppose the topic" in instructions
+    assert "OPPOSE the topic" in instructions
 
 
 def test_debater_deps_dataclass():
@@ -277,3 +279,46 @@ def test_topic_refiner_agent_disables_thinking_and_caps_tokens():
     assert settings["max_tokens"] == 512
     assert settings["temperature"] == 0.7
     assert settings["extra_body"]["thinking"]["type"] == "disabled"
+
+
+def test_search_instructions_exists():
+    assert isinstance(SEARCH_INSTRUCTIONS, str)
+    assert len(SEARCH_INSTRUCTIONS) > 50
+    assert "Conservation Mode" in SEARCH_INSTRUCTIONS
+
+
+def test_search_opening_instructions_exists():
+    assert isinstance(SEARCH_OPENING_INSTRUCTIONS, str)
+    assert len(SEARCH_OPENING_INSTRUCTIONS) > 50
+    assert "Opening Round" in SEARCH_OPENING_INSTRUCTIONS
+
+
+def test_search_opening_used_in_round_0():
+    """Round 0 (first turn) uses SEARCH_OPENING_INSTRUCTIONS, not SEARCH_INSTRUCTIONS."""
+    debater = Debater(name="Test", stance="正方", personality="Test.", enable_search=True)
+    ctx = MagicMock()
+    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=0, max_rounds=3)
+    instructions = _build_debater_instructions(ctx)
+    assert "Opening Round" in instructions
+    assert "Conservation Mode" not in instructions
+
+
+def test_search_conservation_used_in_round_1():
+    """Round 1+ uses SEARCH_INSTRUCTIONS (conservation mode), not the opening variant."""
+    debater = Debater(name="Test", stance="正方", personality="Test.", enable_search=True)
+    ctx = MagicMock()
+    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=1, max_rounds=3)
+    instructions = _build_debater_instructions(ctx)
+    assert "Conservation Mode" in instructions
+    assert "Opening Round" not in instructions
+
+
+def test_search_disabled_skips_both():
+    """When enable_search=False, neither search prompt appears."""
+    debater = Debater(name="Test", stance="正方", personality="Test.", enable_search=False)
+    ctx = MagicMock()
+    ctx.deps = DebaterDeps(topic="Test", debater=debater, round_number=0, max_rounds=3)
+    instructions = _build_debater_instructions(ctx)
+    assert "Opening Round" not in instructions
+    assert "Conservation Mode" not in instructions
+    assert "Web Search" not in instructions

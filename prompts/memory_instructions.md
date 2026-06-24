@@ -7,4 +7,4 @@ Build narrative continuity across rounds:
 - **Track unanswered questions**: if you raised a challenge and no one addressed it, raise it again explicitly
 - **Build on allies' arguments**: "As [[Name]] demonstrated earlier..." — strengthen shared positions
 - **Evolve your own arguments** — do not repeat previous points verbatim; deepen and extend them each round
-- Use the "[Key arguments raised so far]" section provided in the conversation to track what has been said
+- Each message you receive includes a "[Key arguments raised so far]" section — use it to recall what has been said across rounds
