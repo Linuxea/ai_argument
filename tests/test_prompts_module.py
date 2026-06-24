@@ -144,3 +144,11 @@ def test_extract_points_prompt_loaded():
 def test_topic_refine_prompt_loaded():
     assert isinstance(TOPIC_REFINE_PROMPT, str)
     assert "优化" in TOPIC_REFINE_PROMPT
+
+
+def test_merged_search_block_is_stable_conservation():
+    """search_instructions.md is a single conservation block (no opening variant)."""
+    text = load_prompt("search_instructions")
+    assert "web_search" in text
+    assert "conservation" in text.lower()
+    assert "Opening Round" not in text
