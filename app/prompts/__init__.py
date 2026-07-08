@@ -10,12 +10,13 @@ from __future__ import annotations
 from app.prompts.debater import build_debater_system_prompt, build_debater_user_prompt
 from app.prompts.extract import EXTRACT_POINTS_PROMPT
 from app.prompts.judge import JUDGE_SYSTEM_PROMPT, build_judge_transcript
-from app.prompts.topic import TOPIC_REFINE_PROMPT
+from app.prompts.topic import TOPIC_REFINE_PROMPT, TOPIC_SUGGEST_PROMPT
 
 __all__ = [
     "EXTRACT_POINTS_PROMPT",
     "JUDGE_SYSTEM_PROMPT",
     "TOPIC_REFINE_PROMPT",
+    "TOPIC_SUGGEST_PROMPT",
     "build_debater_system_prompt",
     "build_debater_user_prompt",
     "build_judge_transcript",

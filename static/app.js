@@ -62,7 +62,11 @@ class DebateApp {
 
         await this._loadDebaters();
         this._applyUIState('idle');
-        this.renderer.showEmptyState({ onSuggest: (s) => this._useSuggestion(s) });
+        this.renderer.showEmptyState({
+            onSuggest: (s) => this._useSuggestion(s),
+            onRefresh: () => this._loadSuggestions(),
+        });
+        this._loadSuggestions();
         refreshIcons();
     }
 
@@ -182,6 +186,25 @@ class DebateApp {
     _useSuggestion(topic) {
         this.topicInput.value = topic;
         this.topicInput.focus();
+    }
+
+    /** Fetch AI topic suggestions; degrade silently (hide block) on failure.
+     *  Non-critical: never throws, never toasts — keeps the e2e static-server
+     *  path (no backend → 404) free of uncaught rejections. */
+    async _loadSuggestions() {
+        if (!this.messages?.querySelector?.('.empty-state')) return;
+        this.renderer.setSuggestionsLoading();
+        try {
+            const data = await api.getTopicSuggestions();
+            const topics = data?.topics;
+            if (!Array.isArray(topics) || !topics.length) {
+                this.renderer.hideSuggestions();
+                return;
+            }
+            this.renderer.setSuggestions(topics);
+        } catch {
+            this.renderer.hideSuggestions();
+        }
     }
 
     async _refineTopic() {

@@ -17,7 +17,7 @@ from app.prompts.extract import EXTRACT_POINTS_PROMPT
 from app.prompts.judge import JUDGE_SYSTEM_PROMPT, build_judge_transcript
 from app.prompts.loader import load_prompt
 from app.prompts.stances import STANCE_INSTRUCTIONS
-from app.prompts.topic import TOPIC_REFINE_PROMPT
+from app.prompts.topic import TOPIC_REFINE_PROMPT, TOPIC_SUGGEST_PROMPT
 
 
 def _deps(round_number, max_rounds, **debater_kw):
@@ -144,6 +144,12 @@ def test_extract_points_prompt_loaded():
 def test_topic_refine_prompt_loaded():
     assert isinstance(TOPIC_REFINE_PROMPT, str)
     assert "优化" in TOPIC_REFINE_PROMPT
+
+
+def test_topic_suggest_prompt_loaded():
+    assert isinstance(TOPIC_SUGGEST_PROMPT, str)
+    assert "JSON" in TOPIC_SUGGEST_PROMPT
+    assert "辩论" in TOPIC_SUGGEST_PROMPT
 
 
 def test_merged_search_block_is_stable_conservation():

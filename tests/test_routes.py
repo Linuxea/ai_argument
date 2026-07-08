@@ -548,3 +548,94 @@ def test_refine_topic_other_model_http_error(client, patched_settings_with_key):
 
     assert resp.status_code == 502
     assert "失败" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# /api/topic/suggestions
+# ---------------------------------------------------------------------------
+
+
+def test_suggest_topics_requires_api_key(client, monkeypatch):
+    monkeypatch.setattr("app.routes.topic.settings.api_key", "")
+    resp = client.get("/api/topic/suggestions")
+    assert resp.status_code == 400
+    assert "API Key" in resp.json()["detail"]
+
+
+def test_suggest_topics_success(client, patched_settings_with_key):
+    fake_agent = _fake_agent_returning(["AI 是否应取代教师？", "远程办公更高效吗？", "该禁用塑料吗？"])
+    with patch("app.routes.topic.create_topic_suggester_agent", return_value=fake_agent):
+        resp = client.get("/api/topic/suggestions")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"topics": ["AI 是否应取代教师？", "远程办公更高效吗？", "该禁用塑料吗？"]}
+    fake_agent.run.assert_awaited_once()
+
+
+def test_suggest_topics_filters_blanks_and_caps_at_three(client, patched_settings_with_key):
+    fake_agent = _fake_agent_returning(["  有效话题  ", "", "   ", "第四条多余", "第五条"])
+    with patch("app.routes.topic.create_topic_suggester_agent", return_value=fake_agent):
+        resp = client.get("/api/topic/suggestions")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"topics": ["有效话题", "第四条多余", "第五条"]}
+
+
+def test_suggest_topics_empty_result(client, patched_settings_with_key):
+    fake_agent = _fake_agent_returning([])
+    with patch("app.routes.topic.create_topic_suggester_agent", return_value=fake_agent):
+        resp = client.get("/api/topic/suggestions")
+
+    assert resp.status_code == 502
+    assert "未返回" in resp.json()["detail"]
+
+
+def test_suggest_topics_none_output(client, patched_settings_with_key):
+    fake_agent = _fake_agent_returning(None)
+    with patch("app.routes.topic.create_topic_suggester_agent", return_value=fake_agent):
+        resp = client.get("/api/topic/suggestions")
+
+    assert resp.status_code == 502
+
+
+def test_suggest_topics_auth_error(client, patched_settings_with_key):
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    fake_agent = _fake_agent_raising(ModelHTTPError(401, "test-model", body=None))
+    with patch("app.routes.topic.create_topic_suggester_agent", return_value=fake_agent):
+        resp = client.get("/api/topic/suggestions")
+
+    assert resp.status_code == 401
+    assert "API Key" in resp.json()["detail"]
+
+
+def test_suggest_topics_not_found_error(client, patched_settings_with_key):
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    fake_agent = _fake_agent_raising(ModelHTTPError(404, "test-model", body=None))
+    with patch("app.routes.topic.create_topic_suggester_agent", return_value=fake_agent):
+        resp = client.get("/api/topic/suggestions")
+
+    assert resp.status_code == 404
+    assert "模型" in resp.json()["detail"]
+
+
+def test_suggest_topics_other_model_http_error(client, patched_settings_with_key):
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    fake_agent = _fake_agent_raising(ModelHTTPError(500, "test-model", body=None))
+    with patch("app.routes.topic.create_topic_suggester_agent", return_value=fake_agent):
+        resp = client.get("/api/topic/suggestions")
+
+    assert resp.status_code == 502
+    assert "失败" in resp.json()["detail"]
+
+
+def test_suggest_topics_generic_error(client, patched_settings_with_key):
+    fake_agent = _fake_agent_raising(RuntimeError("boom"))
+    with patch("app.routes.topic.create_topic_suggester_agent", return_value=fake_agent):
+        resp = client.get("/api/topic/suggestions")
+
+    assert resp.status_code == 502
+    assert "失败" in resp.json()["detail"]
+    assert "boom" not in resp.json()["detail"]

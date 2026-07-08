@@ -696,6 +696,77 @@
         transform: translateY(-2px);
     }
 
+    .empty-state-suggestion.skeleton {
+        width: 200px;
+        height: 32px;
+        cursor: default;
+        background: linear-gradient(
+            90deg,
+            var(--bg-elevated) 0%,
+            var(--border) 50%,
+            var(--bg-elevated) 100%
+        );
+        background-size: 200% 100%;
+        animation: skeleton-shimmer 1.4s ease-in-out infinite;
+        border-color: transparent;
+        pointer-events: none;
+    }
+
+    .empty-state-suggestion.skeleton:hover {
+        transform: none;
+        background: linear-gradient(
+            90deg,
+            var(--bg-elevated) 0%,
+            var(--border) 50%,
+            var(--bg-elevated) 100%
+        );
+        background-size: 200% 100%;
+        border-color: transparent;
+    }
+
+    @keyframes skeleton-shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    .empty-state-refresh {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--ink-muted);
+        padding: 5px 14px;
+        font-size: var(--text-sm);
+        border-radius: var(--radius-full);
+        cursor: pointer;
+        margin-top: var(--space-1);
+        transition:
+            color var(--duration-fast) var(--ease-out),
+            border-color var(--duration-fast) var(--ease-out);
+    }
+
+    .empty-state-refresh:not(:disabled):hover {
+        color: var(--gold-dim);
+        border-color: var(--gold);
+    }
+
+    .empty-state-refresh:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+    .empty-state-refresh .icon-slot svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .empty-state-suggestion.skeleton {
+            animation: none;
+        }
+    }
+
     /* ─── Floating scroll-to-bottom button ────────── */
 
     .scroll-bottom-btn {

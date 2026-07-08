@@ -113,3 +113,28 @@ def create_topic_refiner_agent(
             "extra_body": {"thinking": {"type": "disabled"}},
         },
     )
+
+
+def create_topic_suggester_agent(
+    model_name: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> Agent[None, list[str]]:
+    """Create a one-shot topic-suggestion agent that returns a list of topics.
+
+    Higher ``temperature`` than the refiner (variety over stability); thinking
+    is disabled (generation, not reasoning). ``output_type=list[str]`` makes
+    PydanticAI enforce a JSON-array tool schema on the model.
+    """
+    return Agent(
+        _make_model(model_name, base_url, api_key),
+        deps_type=None,
+        output_type=list[str],
+        instructions=prompts.TOPIC_SUGGEST_PROMPT,
+        tools=[],
+        model_settings={
+            "max_tokens": 512,
+            "temperature": 0.9,
+            "extra_body": {"thinking": {"type": "disabled"}},
+        },
+    )

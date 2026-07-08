@@ -223,3 +223,78 @@ test('F: renderer populates MessageStore on finalize / addSystem / addUser / add
     renderer.reset();
     assert.equal(store.all().length, 0);
 });
+
+// ─── Empty-state suggestions ──────────────────────────
+
+test('showEmptyState builds a shell with hint, suggestions container and refresh button', () => {
+    const { messages, renderer } = makeRenderer();
+    renderer.showEmptyState({ onSuggest: () => {}, onRefresh: () => {} });
+
+    assert.ok(messages.querySelector('.empty-state h3'));
+    assert.ok(messages.querySelector('.empty-state-hint'), 'intro hint present');
+    assert.ok(messages.querySelector('.empty-state-suggestions'), 'suggestions container present');
+    const refresh = messages.querySelector('.empty-state-refresh');
+    assert.ok(refresh, 'refresh button present');
+    assert.equal(refresh.hidden, true, 'refresh hidden until topics load');
+    assert.equal(messages.querySelectorAll('.empty-state-suggestion').length, 0,
+        'no suggestion pills until populated');
+});
+
+test('setSuggestionsLoading renders 3 skeleton pills and reveals refresh (disabled)', () => {
+    const { messages, renderer } = makeRenderer();
+    renderer.showEmptyState({ onSuggest: () => {}, onRefresh: () => {} });
+    renderer.setSuggestionsLoading();
+
+    assert.equal(messages.querySelectorAll('.empty-state-suggestion.skeleton').length, 3);
+    const refresh = messages.querySelector('.empty-state-refresh');
+    assert.equal(refresh.hidden, false);
+    assert.equal(refresh.disabled, true);
+});
+
+test('setSuggestions renders topic buttons that fire onSuggest', () => {
+    let clicked = null;
+    const { messages, renderer } = makeRenderer();
+    renderer.showEmptyState({ onSuggest: (t) => { clicked = t; }, onRefresh: () => {} });
+    renderer.setSuggestions(['话题一', '话题二', '话题三']);
+
+    const pills = messages.querySelectorAll('.empty-state-suggestion:not(.skeleton)');
+    assert.equal(pills.length, 3);
+    assert.equal(pills[0].textContent, '话题一');
+    pills[1].click();
+    assert.equal(clicked, '话题二');
+
+    const refresh = messages.querySelector('.empty-state-refresh');
+    assert.equal(refresh.hidden, false);
+    assert.equal(refresh.disabled, false, 'refresh re-enabled after load');
+});
+
+test('refresh button fires onRefresh callback', () => {
+    let refreshed = 0;
+    const { messages, renderer } = makeRenderer();
+    renderer.showEmptyState({ onSuggest: () => {}, onRefresh: () => { refreshed++; } });
+    renderer.setSuggestions(['x']);
+    messages.querySelector('.empty-state-refresh').click();
+    assert.equal(refreshed, 1);
+});
+
+test('hideSuggestions removes the hint, suggestions and refresh entirely', () => {
+    const { messages, renderer } = makeRenderer();
+    renderer.showEmptyState({ onSuggest: () => {}, onRefresh: () => {} });
+    renderer.setSuggestionsLoading();
+    renderer.hideSuggestions();
+
+    assert.equal(messages.querySelector('.empty-state-hint'), null);
+    assert.equal(messages.querySelector('.empty-state-suggestions'), null);
+    assert.equal(messages.querySelector('.empty-state-refresh'), null);
+    // Shell (illustration + heading + first paragraph) stays intact.
+    assert.ok(messages.querySelector('.empty-state h3'));
+});
+
+test('suggestion methods are no-ops when empty state is absent', () => {
+    const { renderer, messages } = makeRenderer();
+    // No showEmptyState called — must not throw.
+    renderer.setSuggestionsLoading();
+    renderer.setSuggestions(['a']);
+    renderer.hideSuggestions();
+    assert.equal(messages.children.length, 1, 'only the sentinel remains');
+});

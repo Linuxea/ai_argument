@@ -54,10 +54,13 @@ export class MessageRenderer {
         this.store?.clear();
     }
 
-    /** Show an empty-state hint. */
-    showEmptyState({ onSuggest } = {}) {
+    /** Show an empty-state hint. The suggestions block is populated async
+     *  via setSuggestionsLoading / setSuggestions / hideSuggestions. */
+    showEmptyState({ onSuggest, onRefresh } = {}) {
         const existing = this.container.querySelector('.empty-state');
         if (existing) existing.remove();
+
+        this._onSuggest = onSuggest;
 
         const wrap = document.createElement('div');
         wrap.className = 'empty-state';
@@ -74,23 +77,71 @@ export class MessageRenderer {
                 <path d="M50 74 Q60 70 70 74" stroke-width="2.5"/>
             </svg>
             <h3>开启一场辩论</h3>
-            <p>输入辩题、勾选两位以上的辩手，然后点击「开始辩论」。<br>需要灵感？试试下面的话题：</p>
+            <p>输入辩题、勾选两位以上的辩手，然后点击「开始辩论」。</p>
+            <p class="empty-state-hint">需要灵感？试试 AI 生成的话题：</p>
             <div class="empty-state-suggestions"></div>
+            <button class="empty-state-refresh" type="button" title="换一批" hidden>
+                <span data-lucide="refresh-cw" class="icon-slot"></span>
+                <span>换一批</span>
+            </button>
         `;
 
-        const suggestions = ['人工智能是否会取代程序员？', '远程办公是更好的工作方式吗？', '应该全面禁用一次性塑料吗？'];
-        const sug = wrap.querySelector('.empty-state-suggestions');
-        for (const s of suggestions) {
-            const b = document.createElement('button');
-            b.className = 'empty-state-suggestion';
-            b.type = 'button';
-            b.textContent = s;
-            b.addEventListener('click', () => onSuggest?.(s));
-            sug.appendChild(b);
-        }
+        const refreshBtn = wrap.querySelector('.empty-state-refresh');
+        refreshBtn.addEventListener('click', () => {
+            if (typeof onRefresh === 'function') onRefresh();
+        });
 
         // Insert before sentinel
         this.container.insertBefore(wrap, this.scroller.sentinel);
+        refreshIcons();
+    }
+
+    /** Render shimmering skeleton pills while suggestions load. */
+    setSuggestionsLoading() {
+        const wrap = this.container.querySelector('.empty-state');
+        if (!wrap) return;
+        const sug = wrap.querySelector('.empty-state-suggestions');
+        sug.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            const s = document.createElement('span');
+            s.className = 'empty-state-suggestion skeleton';
+            sug.appendChild(s);
+        }
+        const refresh = wrap.querySelector('.empty-state-refresh');
+        if (refresh) refresh.hidden = false;
+        refresh.disabled = true;
+        refreshIcons();
+    }
+
+    /** Render real topic suggestion buttons. */
+    setSuggestions(topics) {
+        const wrap = this.container.querySelector('.empty-state');
+        if (!wrap) return;
+        const sug = wrap.querySelector('.empty-state-suggestions');
+        sug.innerHTML = '';
+        const list = Array.isArray(topics) ? topics : [];
+        for (const t of list) {
+            const b = document.createElement('button');
+            b.className = 'empty-state-suggestion';
+            b.type = 'button';
+            b.textContent = t;
+            b.addEventListener('click', () => this._onSuggest?.(t));
+            sug.appendChild(b);
+        }
+        const refresh = wrap.querySelector('.empty-state-refresh');
+        if (refresh) {
+            refresh.hidden = false;
+            refresh.disabled = false;
+        }
+    }
+
+    /** Hide the whole suggestions block (intro + pills + refresh) on failure. */
+    hideSuggestions() {
+        const wrap = this.container.querySelector('.empty-state');
+        if (!wrap) return;
+        wrap.querySelector('.empty-state-hint')?.remove();
+        wrap.querySelector('.empty-state-suggestions')?.remove();
+        wrap.querySelector('.empty-state-refresh')?.remove();
     }
 
     hideEmptyState() {

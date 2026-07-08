@@ -88,6 +88,8 @@ export const api = {
     createDebater: (payload) => call('POST', '/api/debaters', payload),
     // Refine calls a real LLM; give it more headroom than the default 30s.
     refineTopic: (topic) => call('POST', '/api/topic/refine', { topic }, { timeout: 60000 }),
+    // Topic suggestions are non-critical; failures are swallowed by the caller.
+    getTopicSuggestions: () => call('GET', '/api/topic/suggestions', null, { timeout: 30000 }),
 };
 
 // Exported for testing only. Not part of the public API.

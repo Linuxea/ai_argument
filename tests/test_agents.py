@@ -12,6 +12,7 @@ from app.agents import (
     create_extractor_agent,
     create_judge_agent,
     create_topic_refiner_agent,
+    create_topic_suggester_agent,
 )
 from app.engine.state import DebaterDeps
 from app.models import Debater
@@ -107,6 +108,16 @@ def test_topic_refiner_agent_disables_thinking_and_caps_tokens():
     settings = agent.model_settings or {}
     assert settings["max_tokens"] == 512
     assert settings["temperature"] == 0.7
+    assert settings["extra_body"]["thinking"]["type"] == "disabled"
+
+
+def test_topic_suggester_agent_returns_list_and_is_spicier():
+    with patch("app.agents._make_model", return_value=_mock_model()):
+        agent = create_topic_suggester_agent("deepseek-chat", "https://api.example.com", "test-key")
+    assert agent.output_type == list[str]
+    settings = agent.model_settings or {}
+    assert settings["max_tokens"] == 512
+    assert settings["temperature"] == 0.9
     assert settings["extra_body"]["thinking"]["type"] == "disabled"
 
 

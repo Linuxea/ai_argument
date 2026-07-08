@@ -13,7 +13,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic_ai.exceptions import ModelHTTPError
 
-from app.agents import create_topic_refiner_agent
+from app.agents import create_topic_refiner_agent, create_topic_suggester_agent
 from app.config import settings
 from app.models import RefineTopicRequest
 
@@ -67,3 +67,39 @@ async def refine_topic(request: RefineTopicRequest):
             detail="模型未返回话题文本，请稍后重试或换个表述",
         )
     return {"refined_topic": refined_topic}
+
+
+@router.get("/api/topic/suggestions")
+async def suggest_topics():
+    """Use AI to generate 3 random debate topic suggestions."""
+    if not settings.api_key:
+        raise HTTPException(status_code=400, detail="请先在设置中配置 API Key")
+
+    agent = create_topic_suggester_agent(
+        settings.model,
+        base_url=settings.api_base_url,
+        api_key=settings.api_key,
+    )
+
+    try:
+        result = await agent.run("请生成 3 个随机的辩论话题。")
+        raw = result.output or []
+        topics = [t.strip() for t in raw if isinstance(t, str) and t.strip()]
+    except ModelHTTPError as exc:
+        status_code = exc.status_code
+        if status_code == 401:
+            raise HTTPException(status_code=401, detail="API Key 无效")
+        if status_code == 404:
+            raise HTTPException(status_code=404, detail="模型不存在或 API URL 不正确")
+        logger.exception("Topic suggest LLM call failed")
+        raise HTTPException(status_code=502, detail="生成话题失败，请稍后重试")
+    except Exception:
+        logger.exception("Topic suggest failed")
+        raise HTTPException(status_code=502, detail="生成话题失败，请稍后重试")
+
+    if not topics:
+        raise HTTPException(
+            status_code=502,
+            detail="模型未返回话题，请稍后重试",
+        )
+    return {"topics": topics[:3]}
